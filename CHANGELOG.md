@@ -1,0 +1,30 @@
+# Changelog
+
+All notable changes to this project are tracked here.
+
+## 1.0.0
+
+- Introduced the `v1` async-first job API.
+- Added job creation, polling, cancellation, and artifact download endpoints.
+- Added synchronous small-file processing mode.
+- Added URL input and multipart upload input.
+- Added recipe-based media transformations including speed, trim, silence trim, normalize, volume, and extract audio.
+- Added audio activity analysis and optional job-attached audio activity diagnostics.
+- Added runtime capabilities endpoint.
+- Added OpenAPI-driven documentation and Scalar UI.
+- Added integration tests, CI workflow, and release workflow.
+- Added development and production environment examples.
+
+## 0.3
+
+- Added `EXTERNAL_PORT` environment variable.
+
+## 0.2
+
+- Added extract images and audio endpoints.
+- Added probe endpoint.
+- Major refactoring.
+
+## 0.1
+
+- Initial version.

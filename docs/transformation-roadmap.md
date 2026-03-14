@@ -4,11 +4,11 @@ This document reflects the current stage of `ffmpeg-api`.
 
 The local API foundation is already implemented. The roadmap is now focused on:
 
-- keeping the local developer experience clean
+- keeping the developer experience clean
 - keeping production configuration explicit
 - documenting the product clearly
-- publishing and versioning releases correctly
-- preparing the project for open-source distribution under an organization
+- automating versioning, releases, and image publishing
+- preparing the project for long-term open-source maintenance under an organization
 
 ## Product summary
 
@@ -62,12 +62,14 @@ It supports:
 - [x] `docs/openapi.yaml`
 - [x] Scalar UI at `/docs`
 - [x] runnable examples in `README.md`
+- [x] contributor and release guidance
 
 ### Quality gates
 
 - [x] integration test suite
 - [x] OpenAPI lint
 - [x] Docker build check in CI
+- [x] PR title validation for Conventional Commits
 
 ## Current roadmap
 
@@ -83,17 +85,21 @@ It supports:
 ### Track 2: Release engineering
 
 - [x] CI workflow for tests, OpenAPI lint, and Docker build
-- [x] release workflow prepared for GitHub Container Registry
-- [x] release guide for organization-owned publishing
-- [ ] define versioning policy for tags and changelog updates
-- [ ] add automated changelog or release note generation
+- [x] automated release PRs with Release Please
+- [x] automated semantic version tags and GitHub Releases
+- [x] generated changelog at `CHANGELOG.md`
+- [x] automated GHCR publishing after releases
+- [x] optional Docker Hub publishing after releases
+- [x] optional Docker Hub README sync from `README.md`
+- [ ] decide whether to use a dedicated `RELEASE_PLEASE_TOKEN` instead of the default `GITHUB_TOKEN`
 
 ### Track 3: Distribution
 
 - [x] Docker image builds locally
 - [x] GitHub Actions ready for GHCR publishing
-- [ ] publish first tagged release from the organization repository
-- [ ] optionally add Docker Hub as a secondary registry
+- [x] Docker Hub publishing path documented and implemented
+- [ ] publish the first automated release from the organization repository
+- [ ] publish the first public Docker Hub image under the chosen namespace
 
 ### Track 4: Future product expansion
 
@@ -127,17 +133,19 @@ Production is optimized for:
 
 The project is prepared for open-source distribution from a GitHub organization repository.
 
-Current preferred registry:
+Current preferred registries:
 
 - GitHub Container Registry
+- Docker Hub as an optional secondary registry
 
 Recommended release flow:
 
-1. merge to `main`
-2. let CI validate tests, OpenAPI, and Docker build
-3. tag a version like `v1.0.0`
-4. push the tag
-5. let the release workflow publish the image to GHCR
+1. open a PR with a Conventional Commit title
+2. merge into `main`
+3. let CI validate tests, OpenAPI, and Docker build
+4. let Release Please update or create the release PR
+5. merge the release PR when you want the next version published
+6. let the release workflow publish the image to GHCR and optionally Docker Hub
 
 See [docs/release-guide.md](release-guide.md) for the operational details.
 
@@ -145,4 +153,3 @@ See [docs/release-guide.md](release-guide.md) for the operational details.
 
 - `silence_trim` removes silent sections; it is not noise reduction.
 - `audio-activity` is a heuristic analysis; it is not speech recognition.
-- Docker Hub is optional and can be added after GHCR is stable.

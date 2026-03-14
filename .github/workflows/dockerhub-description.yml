@@ -1,0 +1,27 @@
+name: Docker Hub Overview
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - "README.md"
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  sync-description:
+    if: ${{ vars.DOCKERHUB_NAMESPACE != '' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Sync Docker Hub description
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ vars.DOCKERHUB_NAMESPACE }}/ffmpeg-api
+          short-description: ${{ github.event.repository.description }}
+          enable-url-completion: true

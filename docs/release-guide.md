@@ -1,10 +1,21 @@
 # Release Guide
 
-This document describes the release model for `ffmpeg-api`.
+This document describes the automated release model for `ffmpeg-api`.
 
-## Current publishing target
+## What is automated
 
-The repository is prepared to publish Docker images to GitHub Container Registry:
+The repository is prepared to automate:
+
+- release PR creation from Conventional Commits
+- semantic version bumps and git tags
+- GitHub Releases with notes generated from commits
+- Docker image publishing to GHCR
+- optional Docker image publishing to Docker Hub
+- optional Docker Hub README and overview sync from `README.md`
+
+## Current registries
+
+Primary registry:
 
 - `ghcr.io/<owner>/ffmpeg-api`
 
@@ -12,25 +23,38 @@ For the Rods Company organization, that becomes:
 
 - `ghcr.io/rods-company/ffmpeg-api`
 
-## Why GHCR first
+Optional secondary registry:
 
-GHCR is the simplest first step because:
+- `<dockerhub-namespace>/ffmpeg-api`
 
-- it integrates directly with GitHub Actions
-- it works well with organization-owned repositories
-- it does not require a separate Docker Hub automation setup
-- it keeps the open-source source code and published image in the same platform
+## Required GitHub setup
 
-Docker Hub can still be added later as a secondary distribution target.
+Before automation works correctly in the organization repository:
 
-The repository is now prepared for both:
+1. keep the repository under the `Rods-Company` organization
+2. enable GitHub Actions for the repository
+3. allow package publishing in the organization
+4. after the first GHCR publish, set the package visibility to `Public`
 
-- GHCR by default
-- Docker Hub optionally, when repository secrets are configured
+## Required secrets and variables
 
-## Release flow
+For GHCR only, no extra secret is required beyond the built-in `GITHUB_TOKEN`.
 
-### Continuous integration
+If you want release PRs and release tags created by a token that can trigger downstream workflows on those PRs, add:
+
+- secret `RELEASE_PLEASE_TOKEN`
+
+If you want Docker Hub publishing, add:
+
+- secret `DOCKERHUB_USERNAME`
+- secret `DOCKERHUB_TOKEN`
+- repository or organization variable `DOCKERHUB_NAMESPACE`
+
+Use `DOCKERHUB_NAMESPACE` for the published image namespace, because the login user and the published namespace are not always the same thing.
+
+## Workflow model
+
+### CI
 
 Every push and pull request to `main` or `master` runs:
 
@@ -40,62 +64,74 @@ Every push and pull request to `main` or `master` runs:
 - OpenAPI lint
 - Docker build smoke check
 
-### Published release
+### PR title validation
 
-Publishing is triggered by pushing a git tag that starts with `v`, for example:
+Pull request titles are validated against Conventional Commits, for example:
 
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+- `feat: add webhook retries`
+- `fix: reject malformed ogg uploads`
+- `refactor: split ffmpeg command builder`
 
-That triggers the release workflow, which:
+This is important because squash merges usually reuse the PR title as the final commit message on the default branch.
 
-- runs tests again
-- lints the OpenAPI document
-- builds the container image
-- pushes the image to GHCR
-- optionally pushes the same image to Docker Hub
+### Release automation
 
-## GitHub organization setup
+Every push to `main` or `master` runs the release workflow:
 
-Before the workflow can push images from an organization repository:
+- if there are releasable commits, Release Please opens or updates a release PR
+- when that release PR is merged, Release Please creates the next tag and GitHub Release
+- the workflow then runs tests again and publishes container images
 
-1. create the repository under the `Rods-Company` organization
-2. ensure GitHub Actions is enabled for the repository
-3. ensure packages can be published for the organization
-4. keep the workflow `packages: write` permission enabled
+Published Docker tags include:
 
-For GHCR, no separate Docker Hub account is required.
+- `<version>`
+- `<major>.<minor>`
+- `<major>`
+- `latest`
 
-## Docker Hub later
+Example for version `1.2.3`:
 
-If you want Docker Hub as an additional public registry later, you will need:
-
-- a Docker Hub namespace
-- repository credentials or access token
-- GitHub Actions secrets for Docker Hub login
-- repository secrets:
-  - `DOCKERHUB_USERNAME`
-  - `DOCKERHUB_TOKEN`
-
-That can be added as a second publish target once GHCR is stable.
-
-## Recommended first public release
-
-For the first public release, use:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-Expected image names:
-
-- `ghcr.io/rods-company/ffmpeg-api:v1.0.0`
+- `ghcr.io/rods-company/ffmpeg-api:1.2.3`
+- `ghcr.io/rods-company/ffmpeg-api:1.2`
+- `ghcr.io/rods-company/ffmpeg-api:1`
 - `ghcr.io/rods-company/ffmpeg-api:latest`
 
-If Docker Hub secrets are configured, also:
+## Conventional Commit policy
 
-- `<dockerhub-username>/ffmpeg-api:v1.0.0`
-- `<dockerhub-username>/ffmpeg-api:latest`
+Recommended types:
+
+- `feat:` for minor releases
+- `fix:` for patch releases
+- `refactor:` for internal code changes that should appear in release notes
+- `perf:` for performance improvements
+- `docs:` for documentation changes
+- `test:` for test changes
+- `build:` for packaging or dependency work
+- `ci:` for workflow changes
+- `chore:` for maintenance that should usually stay hidden from release notes
+
+For breaking changes, use `!`, for example:
+
+- `feat!: remove legacy artifact retention defaults`
+- `fix!: rename analysis response fields`
+
+## Recommended day-to-day flow
+
+1. create a feature branch
+2. open a pull request with a Conventional Commit title
+3. let CI pass
+4. squash merge into `main`
+5. let Release Please update or create the release PR
+6. review and merge the release PR when you want to cut the next version
+7. verify the GitHub Release and published images
+
+## Docker Hub overview sync
+
+If Docker Hub secrets and namespace are configured, the `Docker Hub Overview` workflow syncs the root `README.md` into the Docker Hub repository description.
+
+That means the first sections of `README.md` should stay focused on:
+
+- what the API is
+- what problems it solves
+- the main features
+- where the public images and docs live
