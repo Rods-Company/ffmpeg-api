@@ -2,6 +2,18 @@
 
 All notable changes to this project are tracked here.
 
+## [1.1.1](https://github.com/Rods-Company/ffmpeg-api/compare/v1.1.0...v1.1.1) (2026-03-14)
+
+
+### Bug Fixes
+
+* trigger Docker Hub overview after releases ([fa102a7](https://github.com/Rods-Company/ffmpeg-api/commit/fa102a719f180602b78134bcd2a3e8481a6a32dd))
+
+
+### Documentation
+
+* update the docs files ([#4](https://github.com/Rods-Company/ffmpeg-api/issues/4)) ([566c16f](https://github.com/Rods-Company/ffmpeg-api/commit/566c16fd9d84c9bfb95fc8112a911bac3f56e029))
+
 ## [1.1.0](https://github.com/Rods-Company/ffmpeg-api/compare/v1.0.0...v1.1.0) (2026-03-14)
 
 
