@@ -4,10 +4,16 @@
   "description": "API for FFMPEG, media conversion utility",
   "main": "app.js",
   "bin" : { "ffmpegapi" : "./app.js" },
+  "scripts": {
+    "start": "node app.js",
+    "test": "node tests/run-tests.js"
+  },
   "license": "ISC",
   "dependencies": {
+    "@scalar/express-api-reference": "^0.8.16",
     "busboy": "~0.3.1",
     "compression": "^1.7.4",
+    "dotenv": "^16.4.5",
     "express": "^4.17.1",
     "express-readme": "0.0.5",
     "fluent-ffmpeg": "^2.1.2",

@@ -1,0 +1,580 @@
+openapi: 3.1.0
+info:
+  title: ffmpeg-api
+  version: 1.0.0
+  summary: Async-first media processing API powered by FFmpeg
+  description: >
+    Draft OpenAPI contract for the next version of ffmpeg-api.
+    This specification is intended to be the source of truth for Scalar documentation.
+  license:
+    name: ISC
+    identifier: ISC
+servers:
+  - url: https://api.ffmpeg-api.dev
+    description: Draft public base URL for production deployments.
+tags:
+  - name: Jobs
+    description: Create, inspect, cancel, and download processing jobs.
+  - name: Analysis
+    description: Analyze audio files using lightweight FFmpeg-based heuristics.
+  - name: Capabilities
+    description: Discover runtime FFmpeg and FFprobe capabilities.
+  - name: Health
+    description: Basic service health and readiness checks.
+security: []
+paths:
+  /v1/jobs:
+    post:
+      tags: [Jobs]
+      operationId: createJob
+      summary: Create a media processing job
+      description: >
+        Creates an asynchronous processing job. Input may be provided as a remote URL
+        in JSON or as an uploaded file in multipart form data.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UrlJobCreateRequest'
+            examples:
+              oggFromUrl:
+                summary: Speed up and trim silence from an OGG file
+                value:
+                  input:
+                    type: url
+                    url: https://cdn.example.com/audio/episode.ogg
+                  analysis:
+                    audioActivity: true
+                  recipe:
+                    output:
+                      container: ogg
+                      filename: episode-fast.ogg
+                    operations:
+                      - type: silence_trim
+                        startThreshold: -40dB
+                        startDuration: 0.3
+                        stopThreshold: -40dB
+                        stopDuration: 0.5
+                      - type: speed
+                        factor: 1.25
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadJobCreateRequest'
+            encoding:
+              recipe:
+                contentType: application/json
+              analysis:
+                contentType: application/json
+      responses:
+        '202':
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Input too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Queue is full
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/jobs/{jobId}:
+    get:
+      tags: [Jobs]
+      operationId: getJob
+      summary: Get job status
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Job found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/jobs/{jobId}/cancel:
+    post:
+      tags: [Jobs]
+      operationId: cancelJob
+      summary: Cancel a queued or running job
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '202':
+          description: Cancel request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Job can no longer be canceled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/jobs/{jobId}/artifact:
+    get:
+      tags: [Jobs]
+      operationId: downloadJobArtifact
+      summary: Download the completed job artifact
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Generated artifact
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Artifact or job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Job is not completed yet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/analyze/audio-activity:
+    post:
+      tags: [Analysis]
+      operationId: analyzeAudioActivity
+      summary: Analyze whether audio is mostly silence or only low-value background activity
+      description: >
+        Runs a speech-band activity heuristic using FFmpeg silence detection.
+        This endpoint does not perform speech recognition. It is intended to detect
+        whether an audio file is likely background-only or contains foreground activity.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AudioActivityUrlRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AudioActivityUploadRequest'
+            encoding:
+              options:
+                contentType: application/json
+      responses:
+        '200':
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioActivityResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Input too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/capabilities:
+    get:
+      tags: [Capabilities]
+      operationId: getCapabilities
+      summary: List runtime FFmpeg capabilities
+      responses:
+        '200':
+          description: Runtime capabilities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Capabilities'
+        '500':
+          description: Failed to collect capabilities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Health check
+      responses:
+        '200':
+          description: Service health
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  parameters:
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    UrlJobCreateRequest:
+      type: object
+      required: [input, recipe]
+      properties:
+        input:
+          type: object
+          required: [type, url]
+          properties:
+            type:
+              type: string
+              const: url
+            url:
+              type: string
+              format: uri
+        analysis:
+          $ref: '#/components/schemas/JobAnalysisRequest'
+        recipe:
+          $ref: '#/components/schemas/TransformRecipe'
+    AudioActivityUrlRequest:
+      type: object
+      required: [input]
+      properties:
+        input:
+          type: object
+          required: [type, url]
+          properties:
+            type:
+              type: string
+              const: url
+            url:
+              type: string
+              format: uri
+        options:
+          $ref: '#/components/schemas/AudioActivityOptions'
+    AudioActivityUploadRequest:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+        options:
+          description: JSON-encoded AudioActivityOptions
+          type: string
+    UploadJobCreateRequest:
+      type: object
+      required: [file, recipe]
+      properties:
+        file:
+          type: string
+          format: binary
+        analysis:
+          description: JSON-encoded JobAnalysisRequest
+          type: string
+        recipe:
+          description: JSON-encoded TransformRecipe
+          type: string
+    JobAnalysisRequest:
+      type: object
+      properties:
+        audioActivity:
+          oneOf:
+            - type: boolean
+            - $ref: '#/components/schemas/AudioActivityOptions'
+    AudioActivityOptions:
+      type: object
+      properties:
+        noiseThresholdDb:
+          type: number
+          example: -35
+        minSilenceDuration:
+          type: number
+          example: 0.5
+        minSegmentDuration:
+          type: number
+          example: 1.2
+        minActiveRatio:
+          type: number
+          example: 0.08
+        useSpeechBand:
+          type: boolean
+          example: true
+    TransformRecipe:
+      type: object
+      required: [output, operations]
+      properties:
+        output:
+          type: object
+          required: [container]
+          properties:
+            container:
+              type: string
+              example: ogg
+            filename:
+              type: string
+              example: episode-fast.ogg
+        operations:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Operation'
+    Operation:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum:
+            - speed
+            - silence_trim
+            - trim
+            - normalize
+            - volume
+            - channels
+            - sample_rate
+            - resize
+            - fps
+            - mute
+            - extract_audio
+            - watermark
+      additionalProperties: true
+    JobAccepted:
+      type: object
+      required: [id, status, links]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued]
+        links:
+          type: object
+          properties:
+            self:
+              type: string
+              example: /v1/jobs/07d4a4a5-55f0-4c29-8790-b7546a9b2854
+            artifact:
+              type: string
+              example: /v1/jobs/07d4a4a5-55f0-4c29-8790-b7546a9b2854/artifact
+            cancel:
+              type: string
+              example: /v1/jobs/07d4a4a5-55f0-4c29-8790-b7546a9b2854/cancel
+    Job:
+      type: object
+      required: [id, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - queued
+            - downloading
+            - processing
+            - completed
+            - failed
+            - canceled
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        input:
+          type: object
+          additionalProperties: true
+        recipe:
+          $ref: '#/components/schemas/TransformRecipe'
+        analysis:
+          anyOf:
+            - type: object
+              properties:
+                audioActivity:
+                  $ref: '#/components/schemas/AudioActivityAnalysis'
+            - type: 'null'
+        progress:
+          type: object
+          properties:
+            phase:
+              type: string
+              example: processing
+            percent:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 100
+        artifact:
+          anyOf:
+            - type: object
+              properties:
+                filename:
+                  type: string
+                contentType:
+                  type: string
+                sizeBytes:
+                  type: integer
+                  format: int64
+                downloadUrl:
+                  type: string
+            - type: 'null'
+        metrics:
+          type: object
+          properties:
+            queueWaitMs:
+              type: integer
+              format: int64
+            downloadMs:
+              type: integer
+              format: int64
+            processingMs:
+              type: integer
+              format: int64
+            totalMs:
+              type: integer
+              format: int64
+            inputBytes:
+              type: integer
+              format: int64
+            outputBytes:
+              type: integer
+              format: int64
+        error:
+          $ref: '#/components/schemas/Error'
+    Capabilities:
+      type: object
+      properties:
+        ffmpegVersion:
+          type: string
+        ffprobeVersion:
+          type: string
+        formats:
+          type: array
+          items:
+            type: string
+        codecs:
+          type: array
+          items:
+            type: string
+        filters:
+          type: array
+          items:
+            type: string
+    AudioActivityResponse:
+      type: object
+      properties:
+        input:
+          type: object
+          additionalProperties: true
+        analysis:
+          $ref: '#/components/schemas/AudioActivityAnalysis'
+    AudioActivityAnalysis:
+      type: object
+      properties:
+        analysisType:
+          type: string
+        warning:
+          type: string
+        settings:
+          $ref: '#/components/schemas/AudioActivityOptions'
+        durationSeconds:
+          type: number
+        silenceDurationSeconds:
+          type: number
+        activeDurationSeconds:
+          type: number
+        silenceRatio:
+          type: number
+        activeRatio:
+          type: number
+        longestActiveSegmentSeconds:
+          type: number
+        hasAudioActivity:
+          type: boolean
+        likelyBackgroundOnly:
+          type: boolean
+        likelyContainsSpeechLikeActivity:
+          type: boolean
+        silenceSegments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeSegment'
+        activeSegments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeSegment'
+    TimeSegment:
+      type: object
+      properties:
+        start:
+          type: number
+        end:
+          type: number
+        duration:
+          type: number
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: queue_full
+        message:
+          type: string
+          example: The processing queue is full.
+        details:
+          anyOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'

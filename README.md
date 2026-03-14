@@ -1,6 +1,25 @@
 # FFMPEG API
 
-A web service for converting audio/video/image files using FFMPEG.
+An async-first media processing API built on FFmpeg.
+
+It is designed for backend workflows where you need to:
+
+* transform audio or video files with a simple HTTP API
+* process files by upload or direct URL
+* run synchronous processing for small files
+* queue larger jobs asynchronously
+* detect whether an audio file is probably just background noise or silence
+* inspect runtime FFmpeg capabilities from the API itself
+
+In practice, this API can:
+
+* speed up audio
+* trim clips
+* remove silent sections
+* normalize and adjust volume
+* extract audio from video
+* analyze audio activity
+* return generated artifacts directly or through job polling
 
 Based on:
 
@@ -11,39 +30,113 @@ Based on:
 
 FFMPEG API is provided as Docker image for easy consumption. [See the use cases and troubleshooting (catswords-oss.rdbl.io)](https://catswords-oss.rdbl.io/1274143468/3500729784).
 
+## Documentation
+* `README.md` - Quick start and runtime configuration.
+* `technical-notes.md` - Runtime and codec notes.
+* `docs/transformation-roadmap.md` - Current product roadmap, environment model, and release direction.
+* `docs/openapi.yaml` - OpenAPI document served by the application and used by Scalar.
+* `docs/release-guide.md` - Release and publishing guide for organization-owned repositories.
+* `GET /docs` - Interactive API reference powered by Scalar.
+
 ## Endpoints
-* `GET /` - API Readme.
+* `GET /` - Service landing page.
+* `GET /docs` - Interactive API documentation powered by Scalar.
+* `GET /openapi.yaml` - Raw OpenAPI document.
 * `GET /endpoints` - Service endpoints as JSON.
-* `POST /convert/audio/to/mp3` - Convert audio file in request body to mp3. Returns mp3-file.
-* `POST /convert/audio/to/wav` - Convert audio file in request body to wav. Returns wav-file.
-* `POST /convert/video/to/mp4` - Convert video file in request body to mp4. Returns mp4-file.
-* `POST /convert/image/to/jpg` - Convert image file to jpg. Returns jpg-file.
-* `POST /video/extract/audio` - Extract audio track from POSTed video file. Returns audio track as 1-channel wav-file.
-  * Query param: `mono=no` - Returns audio track, all channels.
-* `POST /video/extract/images` - Extract images from POSTed video file as PNG. Default FPS is 1. Returns JSON that includes download links to extracted images.
-  * Query param: `compress=zip|gzip` - Returns extracted images as _zip_ or _tar.gz_ (gzip).
-  * Query param: `fps=2` - Extract images using specified FPS.
-  * Query param: `download=yes` - Downloads extracted image file and deletes it from server, immediately.
-* `GET /video/extract/download/:filename` - Downloads extracted image file and deletes it from server.
-  * Query param: `delete=no` - does not delete file.
-* `POST /probe` - Probe media file, return JSON metadata.
+* `GET /v1/health` - Service health and effective runtime settings.
+* `GET /v1/capabilities` - Runtime FFmpeg, FFprobe, formats, codecs, and filters.
+* `POST /v1/analyze/audio-activity` - Heuristic analysis to detect whether audio is likely background-only.
+* `POST /v1/jobs` - Create a processing job from JSON URL input or multipart upload.
+* `GET /v1/jobs/:jobId` - Poll async job state.
+* `POST /v1/jobs/:jobId/cancel` - Cancel a queued or running job.
+* `GET /v1/jobs/:jobId/artifact` - Download the completed output file.
 
-## Docker image
+## API model
+The service is async-first and job-based.
 
-### Build your own
-* Clone this repository.
-* Build Docker image:
-  * `docker build -t ffmpeg-api .`
-* Run image in foreground:
-  * `docker run -it --rm --name ffmpeg-api -p 3000:3000 ffmpeg-api`
-* Run image in background:
-  * `docker run -d -name ffmpeg-api -p 3000:3000 ffmpeg-api`
+* URL input uses `application/json`.
+* Upload input uses `multipart/form-data`.
+* `mode=auto|sync|async` controls whether the request should try the synchronous path.
+* Small inputs can be processed synchronously when `ENABLE_SYNC_SMALL_JOBS=true`.
+* `analysis.audioActivity` can be enabled inside `POST /v1/jobs` when you want the job to include a background-only diagnostic without sending the file twice.
 
-### Use existing
-* Run image in foreground:
-  * `docker run -it --rm --name ffmpeg-api -p 3000:3000 gnh1201/ffmpeg-api`
-* Run image in background:
-  * `docker run -d --name ffmpeg-api -p 3000:3000 gnh1201/ffmpeg-api`
+See [docs/transformation-roadmap.md](docs/transformation-roadmap.md) for the architecture and [docs/openapi.yaml](docs/openapi.yaml) for the contract.
+
+## Release and environments
+
+The repository is prepared for:
+
+* local development with `.env.development.example`
+* production-style configuration with `.env.production.example`
+* CI validation on push and pull request
+* tagged Docker image releases to GitHub Container Registry
+
+See [docs/release-guide.md](docs/release-guide.md) for the release flow.
+
+## Running
+
+### Run with Docker
+
+Build the image from the repository root:
+
+```bash
+docker build -t ffmpeg-api .
+```
+
+Run the container with default settings:
+
+```bash
+docker run --rm -p 3000:3000 --name ffmpeg-api ffmpeg-api
+```
+
+Run the container in background using `.env.example` as a base:
+
+```bash
+cp .env.example .env
+docker run -d \
+  --name ffmpeg-api \
+  --env-file .env \
+  -p 3000:3000 \
+  ffmpeg-api
+```
+
+After the container starts:
+
+* API docs: `http://127.0.0.1:3000/docs`
+* OpenAPI: `http://127.0.0.1:3000/openapi.yaml`
+* Health check: `http://127.0.0.1:3000/v1/health`
+
+### Run locally
+
+Install dependencies inside `src/`:
+
+```bash
+cd src
+npm install
+```
+
+Start the API:
+
+```bash
+npm start
+```
+
+If you want custom settings locally, create `src/.env` or export variables before starting the server.
+
+After startup:
+
+* API docs: `http://127.0.0.1:3000/docs`
+* Health check: `http://127.0.0.1:3000/v1/health`
+
+### Run in Dockploy
+
+For Dockploy or any container platform that supports environment variables:
+
+* use the image built from this repository
+* expose container port `3000`
+* start from [.env.production.example](.env.production.example)
+* override only the values you actually need
+* keep `ALLOW_PRIVATE_URLS=false` unless you have a controlled private-network use case
 
 ### Environment variables
 * Default log level is _info_. Set log level using environment variable, _LOG_LEVEL_.
@@ -57,72 +150,128 @@ FFMPEG API is provided as Docker image for easy consumption. [See the use cases 
 * When running on Docker/Kubernetes, port binding can be different than default 3000. Use _EXTERNAL_PORT_ to set up external port in returned URLs in extracted images JSON:
   * `docker run -it --rm -p 3001:3000 -e EXTERNAL_PORT=3001 gnh1201/ffmpeg-api`
 
+### V1 service environment
+The new `v1` job API is configurable through environment variables and all of them have defaults. For Docker, Dockploy, or Compose-style deployments, see [.env.example](.env.example).
+
+* `SERVER_PORT=3000` - Internal HTTP port used by the service.
+* `ENABLE_SYNC_SMALL_JOBS=true` - Allows the API to process small requests synchronously instead of creating an async job.
+* `SYNC_MAX_INPUT_BYTES=10485760` - Maximum size in bytes for automatic synchronous processing. Default is 10MB.
+* `JOB_CONCURRENCY=2` - Number of FFmpeg jobs processed in parallel.
+* `MAX_QUEUE_SIZE=100` - Maximum queued async jobs before the API returns `429`.
+* `JOB_RETENTION_MS=900000` - How long completed artifacts stay available for download. Default is 15 minutes.
+* `JOB_TIMEOUT_MS=3600000` - Socket timeout for long-running requests. Default is 1 hour.
+* `DOWNLOAD_TIMEOUT_MS=60000` - Timeout for remote URL downloads. Default is 60 seconds.
+* `URL_MAX_REDIRECTS=5` - Maximum redirects allowed when ingesting a URL.
+* `ALLOW_PRIVATE_URLS=false` - When `true`, the API accepts loopback and private network URLs. Keep this `false` in most deployments.
+* `JSON_BODY_LIMIT=1mb` - Maximum JSON payload size for URL-based requests.
+* `AUDIO_ACTIVITY_NOISE_THRESHOLD_DB=-35` - Silence threshold used by the audio activity analyzer.
+* `AUDIO_ACTIVITY_MIN_SILENCE_DURATION=0.5` - Minimum silence duration for the analyzer.
+* `AUDIO_ACTIVITY_MIN_SEGMENT_DURATION=1.2` - Minimum active segment duration required to avoid being classified as background-only.
+* `AUDIO_ACTIVITY_MIN_ACTIVE_RATIO=0.08` - Minimum active ratio required to avoid being classified as background-only.
+* `AUDIO_ACTIVITY_USE_SPEECH_BAND=true` - When enabled, the analyzer applies a speech-band filter before silence detection.
+
 ## Usage
 Input file to FFMPEG API can be anything that ffmpeg supports. See [ffmpeg docs for supported formats (www.ffmpeg.org)](https://www.ffmpeg.org/general.html#Supported-File-Formats_002c-Codecs-or-Features).
 
-### Convert
-Convert audio/video/image files using the API.
+### Sync request from URL
 
-* `curl -F "file=@input.wav" 127.0.0.1:3000/convert/audio/to/mp3  > output.mp3`
-* `curl -F "file=@input.m4a" 127.0.0.1:3000/convert/audio/to/wav  > output.wav`
-* `curl -F "file=@input.mov" 127.0.0.1:3000/convert/video/to/mp4  > output.mp4`
-* `curl -F "file=@input.mp4" 127.0.0.1:3000/convert/videp/to/mp4  > output.mp4`
-* `curl -F "file=@input.tiff" 127.0.0.1:3000/convert/image/to/jpg  > output.jpg`
-* `curl -F "file=@input.png" 127.0.0.1:3000/convert/image/to/jpg  > output.jpg`
+```bash
+curl -X POST http://127.0.0.1:3000/v1/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "sync",
+    "input": {
+      "type": "url",
+      "url": "https://example.com/input.ogg"
+    },
+    "analysis": {
+      "audioActivity": true
+    },
+    "recipe": {
+      "output": {
+        "container": "ogg",
+        "filename": "output.ogg"
+      },
+      "operations": [
+        {
+          "type": "speed",
+          "factor": 1.2
+        }
+      ]
+    }
+  }' > output.ogg
+```
 
-### Extract images
-Extract images from video using the API.
+When `analysis.audioActivity` is enabled in synchronous mode, the API returns the generated file and includes the diagnostic summary in response headers such as:
 
-* `curl -F "file=@input.mov" 127.0.0.1:3000/video/extract/images`
-  * Returns JSON that lists image download URLs for each extracted image.
-  * Default FPS is 1.
-  * Images are in PNG-format.
-  * See sample: [extracted_images.json](samples/extracted_images.json).
-* `curl 127.0.0.1:3000/video/extract/download/ba0f565c-0001.png`
-  * Downloads exracted image and deletes it from server.
-* `curl 127.0.0.1:3000/video/extract/download/ba0f565c-0001.png?delete=no`
-  * Downloads exracted image but does not deletes it from server.
-* `curl -F "file=@input.mov" 127.0.0.1:3000/video/extract/images?compress=zip > images.zip`
-  * Returns ZIP package of all extracted images.
-* `curl -F "file=@input.mov" 127.0.0.1:3000/video/extract/images?compress=gzip > images.tar.gz`
-  * Returns GZIP (tar.gz) package of all extracted images.
-* `curl -F "file=@input.mov" 127.0.0.1:3000/video/extract/images?fps=0.5`
-  * Sets FPS to extract images. FPS=0.5 is every two seconds, FPS=4 is four images per seconds, etc.
+* `X-Audio-Activity-Background-Only`
+* `X-Audio-Activity-Contains-Speech-Like-Activity`
+* `X-Audio-Activity-Active-Ratio`
 
-### Extract audio
-Extract audio track from video using the API.
+### Async request from URL
 
-* `curl -F "file=@input.mov" 127.0.0.1:3000/video/extract/audio`
- * Returns 1-channel WAV-file of video's audio track.
-* `curl -F "file=@input.mov" 127.0.0.1:3000/video/extract/audio?mono=no`
- * Returns WAV-file of video's audio track, with all the channels as in input video.
+```bash
+curl -X POST http://127.0.0.1:3000/v1/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "async",
+    "input": {
+      "type": "url",
+      "url": "https://example.com/input.ogg"
+    },
+    "analysis": {
+      "audioActivity": true
+    },
+    "recipe": {
+      "output": {
+        "container": "ogg",
+        "filename": "output.ogg"
+      },
+      "operations": [
+        {
+          "type": "silence_trim"
+        },
+        {
+          "type": "speed",
+          "factor": 1.2
+        }
+      ]
+    }
+  }'
+```
 
-### Probe
-Probe audio/video/image files using the API.
+### Polling a job
 
-* `curl -F "file=@input.mov" 127.0.0.1:3000/probe`
-  * Returns JSON metadata of media file.
-  * The same JSON metadata as in ffprobe command: `ffprobe -of json -show_streams -show_format input.mov`.
-  * See sample of MOV-video metadata: [probe_metadata.json](samples/probe_metadata.json).
+* `curl http://127.0.0.1:3000/v1/jobs/<jobId>`
+* `curl http://127.0.0.1:3000/v1/jobs/<jobId>/artifact > output.ogg`
+
+When `analysis.audioActivity` is enabled for an async job, the diagnostic is attached to the job payload in the `analysis.audioActivity` field.
+
+### Analyze whether audio is probably background-only
+
+```bash
+curl -X POST http://127.0.0.1:3000/v1/analyze/audio-activity \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": {
+      "type": "url",
+      "url": "https://example.com/input.ogg"
+    }
+  }'
+```
+
+This endpoint does not recognize speech. It uses a speech-band activity heuristic and returns fields such as:
+
+* `hasAudioActivity`
+* `likelyBackgroundOnly`
+* `likelyContainsSpeechLikeActivity`
+* `silenceSegments`
+* `activeSegments`
 
 ## Background
 Originally developed by [Paul Visco @surebert (github.com)](https://github.com/surebert).
 
 Changes include new functionality, updated Node.js version, Docker image based on Alpine, logging and other major refactoring.
-
-## Use case
-
-### Creating a container
-
-```bash
-cd /usr/local/src
-git clone https://github.com/gnh1201/ffmpeg-api
-cd ffmpeg-api
-docker build -t gnh1201/ffmpeg-api .
-sudo mkdir /var/cache/ffmpeg-api
-sudo chmod -R 777 /var/cache/ffmpeg-api
-sudo docker run -itd --rm -p 127.0.0.1:3000:3000 -v /var/cache/ffmpeg-api:/tmp -e KEEP_ALL_FILES=false -e LOG_LEVEL=debug gnh1201/ffmpeg-api # OR `-p 0.0.0.0:3000:3000`
-```
 
 ## Report abuse
 * [GitHub Security Advisories (gnh1201/ffmpeg-api)](https://github.com/gnh1201/ffmpeg-api/security/advisories)

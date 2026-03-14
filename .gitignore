@@ -2,6 +2,7 @@
 *.mp3
 *.m4a
 *.zip
+samples/test-tone.wav
 TODO*
 uploads/*
 dev.dockerfile
@@ -10,12 +11,14 @@ dev.dockerfile
 .ebextensions
 nbproject
 public
-package-lock.json
+/package-lock.json
+!/src/package-lock.json
 input
 
 node-ffmpeg.zip
 
 /node_modules
+/src/node_modules
 # Elastic Beanstalk Files
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
