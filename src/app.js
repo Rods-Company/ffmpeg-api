@@ -1,10 +1,12 @@
 require('dotenv').config();
 
 const express = require('express');
+const path = require('path');
 const compression = require('compression');
 const all_routes = require('express-list-endpoints');
 
 const logger = require('./utils/logger.js');
+const {getStartupBanner} = require('./utils/startup-banner.js');
 const constants = require('./constants.js');
 const {getOpenApiDocument} = require('./services/openapi-doc.js');
 const {normalizeError} = require('./services/errors.js');
@@ -73,6 +75,7 @@ function createApp() {
 
     app.use(compression());
     app.use(express.json({limit: constants.jsonBodyLimit}));
+    app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
     var v1 = require('./routes/v1/index.js');
     app.use('/v1', v1);
@@ -126,9 +129,11 @@ function startServer(port) {
     const app = createApp();
     const listenPort = port === undefined || port === null ? constants.serverPort : port;
     const server = app.listen(listenPort, function() {
-        let host = server.address().address;
         let currentPort = server.address().port;
-        logger.info('Server started and listening http://'+host+':'+currentPort);
+        if (constants.showStartupBanner) {
+            console.log(getStartupBanner(currentPort));
+        }
+        logger.info(`Server listening on port ${currentPort}`);
     });
 
     server.on('connection', function(socket) {

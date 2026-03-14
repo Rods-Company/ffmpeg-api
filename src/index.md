@@ -2,37 +2,39 @@
 
 An async-first media processing API powered by FFMPEG and maintained by Rods Company.
 
-Sources: https://github.com/gnh1201/ffmpeg-api
-
-Based on:
-
-- https://github.com/samisalkosuo/ffmpeg-api
-- https://github.com/surebert/docker-ffmpeg-service
-- https://github.com/jrottenberg/ffmpeg 
-- https://github.com/fluent-ffmpeg/node-fluent-ffmpeg
-
-## 📚 Docs
-
-- [Interactive API reference](./docs)
-- [OpenAPI document](./openapi.yaml)
-- [Endpoint listing](./endpoints)
-
 ## 🚀 Quick Start
 
 - Health check: `GET /v1/health`
 - Runtime capabilities: `GET /v1/capabilities`
 - Interactive docs: `GET /docs`
+- Raw OpenAPI: `GET /openapi.yaml`
 - Create a job: `POST /v1/jobs`
 
-## ⚙️ API Model
+## ✨ What It Does
 
-- The API is job-based and async-first.
-- Small inputs can run synchronously when `mode=sync` or when `mode=auto` matches the configured sync threshold.
-- Input can be sent as a remote URL in JSON or as multipart upload.
-- Transformations are described by a `recipe` object.
+- Processes audio and video through a recipe-based API
+- Accepts upload input and direct URL input
+- Runs small requests synchronously and larger ones asynchronously
+- Analyzes audio activity to detect background-only input
+- Exposes runtime FFmpeg capabilities and interactive documentation
+
+## 📚 Important Links
+
+- [Interactive API reference](./docs)
+- [OpenAPI document](./openapi.yaml)
+- [Endpoint listing](./endpoints)
 
 ## 📝 Important Note
 
 The current `silence_trim` operation removes silent segments. It is not noise reduction.
 
 If your expectation is to remove background hiss, hum, fan noise, or room noise, that is a different feature and should be implemented as a dedicated audio operation such as `noise_reduction`.
+
+---
+
+![Rods Company logo](/assets/logo-rods-horizontal-cinza-escuro.png)
+
+Construa com foco.
+Crie com autonomia.
+
+— with ❤️ by Rods Company

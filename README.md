@@ -123,17 +123,31 @@ If you want custom settings locally, create `src/.env` or export variables befor
 
 For Dockploy or any container platform that supports environment variables:
 
-- use the image built from this repository
+- use [compose.dockploy.yml](compose.dockploy.yml) as the base compose file
+- use the published image `rodscompany/ffmpeg-api:latest` or pin a version such as `rodscompany/ffmpeg-api:1.1.0`
 - expose container port `3000`
 - start from [.env.production.example](.env.production.example)
 - override only the values you actually need
 - keep `ALLOW_PRIVATE_URLS=false` unless you have a controlled private-network use case
+
+Example Dockploy variables:
+
+- `FFMPEG_API_IMAGE=rodscompany/ffmpeg-api:latest`
+- `PUBLIC_PORT=3000`
+- `EXTERNAL_PORT=3000`
+- `PUBLIC_BASE_URL=https://ffmpeg-api.seudominio.com`
+- `JOB_CONCURRENCY=2`
+- `MAX_QUEUE_SIZE=100`
+
+The compose file also mounts a named volume at `/tmp/ffmpeg-api` so temporary artifacts are not lost immediately when the container restarts.
 
 ## 🌍 Environment
 
 The new `v1` job API is configurable through environment variables and all of them have defaults. For Docker, Dockploy, or Compose-style deployments, see [.env.example](.env.example).
 
 - `SERVER_PORT=3000` internal HTTP port used by the service
+- `EXTERNAL_PORT=3000` external/public port exposed by the deployment
+- `PUBLIC_BASE_URL=` optional full public base URL used in startup links, for example `https://ffmpeg-api.rods.company`
 - `ENABLE_SYNC_SMALL_JOBS=true` allows the API to process small requests synchronously instead of creating an async job
 - `SYNC_MAX_INPUT_BYTES=10485760` maximum size in bytes for automatic synchronous processing
 - `JOB_CONCURRENCY=2` number of FFmpeg jobs processed in parallel
@@ -149,6 +163,7 @@ The new `v1` job API is configurable through environment variables and all of th
 - `AUDIO_ACTIVITY_MIN_SEGMENT_DURATION=1.2` minimum active segment duration required to avoid being classified as background-only
 - `AUDIO_ACTIVITY_MIN_ACTIVE_RATIO=0.08` minimum active ratio required to avoid being classified as background-only
 - `AUDIO_ACTIVITY_USE_SPEECH_BAND=true` applies a speech-band filter before silence detection
+- `SHOW_STARTUP_BANNER=true` enables the Rods Company startup banner and quick links in the server console
 
 ## 🧪 Usage
 
