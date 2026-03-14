@@ -8,7 +8,7 @@ const all_routes = require('express-list-endpoints');
 const logger = require('./utils/logger.js');
 const {getStartupBanner} = require('./utils/startup-banner.js');
 const constants = require('./constants.js');
-const {getOpenApiDocument} = require('./services/openapi-doc.js');
+const {getOpenApiDocument, getEffectivePublicBaseUrl} = require('./services/openapi-doc.js');
 const {normalizeError} = require('./services/errors.js');
 
 const timeout = constants.jobTimeoutMs;
@@ -61,6 +61,7 @@ function getScalarMiddleware() {
                     orderRequiredPropertiesFirst: true,
                     slug: 'ffmpeg-api',
                     title: constants.scalarTitle,
+                    baseServerURL: constants.publicBaseUrl || undefined,
                     url: '/openapi.yaml',
                     pageTitle: constants.scalarTitle,
                 });
@@ -81,7 +82,7 @@ function createApp() {
     app.use('/v1', v1);
 
     app.get('/openapi.yaml', function(req, res) {
-        res.type('application/yaml').send(getOpenApiDocument());
+        res.type('application/yaml').send(getOpenApiDocument(req));
     });
 
     app.use('/docs', function(req, res, next) {

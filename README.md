@@ -169,6 +169,13 @@ The new `v1` job API is configurable through environment variables and all of th
 
 Input media can be anything that FFmpeg supports. `.ogg` is a first-class supported output format in the API examples and tests.
 
+You can send media in two ways:
+
+- by URL with `application/json`
+- by direct file upload with `multipart/form-data`
+
+For uploads, use a file field named `file`.
+
 ### Sync request from URL
 
 ```bash
@@ -203,6 +210,17 @@ When `analysis.audioActivity` is enabled in synchronous mode, the API returns th
 - `X-Audio-Activity-Background-Only`
 - `X-Audio-Activity-Contains-Speech-Like-Activity`
 - `X-Audio-Activity-Active-Ratio`
+
+### Sync request from upload
+
+```bash
+curl -X POST http://127.0.0.1:3000/v1/jobs \
+  -F "file=@./input.ogg" \
+  -F "mode=sync" \
+  -F "analysis={\"audioActivity\":true}" \
+  -F "recipe={\"output\":{\"container\":\"ogg\",\"filename\":\"output.ogg\"},\"operations\":[{\"type\":\"speed\",\"factor\":1.2}]}" \
+  -o output.ogg
+```
 
 ### Async request from URL
 
@@ -243,6 +261,16 @@ curl -X POST http://127.0.0.1:3000/v1/jobs \
 
 When `analysis.audioActivity` is enabled for an async job, the diagnostic is attached to the job payload in the `analysis.audioActivity` field.
 
+### Async request from upload
+
+```bash
+curl -X POST http://127.0.0.1:3000/v1/jobs \
+  -F "file=@./input.ogg" \
+  -F "mode=async" \
+  -F "analysis={\"audioActivity\":true}" \
+  -F "recipe={\"output\":{\"container\":\"ogg\",\"filename\":\"output.ogg\"},\"operations\":[{\"type\":\"silence_trim\"},{\"type\":\"speed\",\"factor\":1.2}]}"
+```
+
 ### Analyze whether audio is probably background-only
 
 ```bash
@@ -263,6 +291,14 @@ This endpoint does not recognize speech. It uses a speech-band activity heuristi
 - `likelyContainsSpeechLikeActivity`
 - `silenceSegments`
 - `activeSegments`
+
+### Analyze an uploaded file
+
+```bash
+curl -X POST http://127.0.0.1:3000/v1/analyze/audio-activity \
+  -F "file=@./input.ogg" \
+  -F "options={\"minActiveRatio\":0.08,\"minSegmentDuration\":1.2}"
+```
 
 ## 🏷️ Release Automation
 
