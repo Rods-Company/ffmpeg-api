@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="320" viewBox="0 0 520 320" role="img" aria-labelledby="title desc">
+  <title id="title">Rods Company Logo</title>
+  <desc id="desc">ASCII-style Rods Company logo with the text Construa com foco. Crie com autonomia.</desc>
+  <rect width="520" height="320" fill="#f6f3ec"/>
+  <g fill="#a14d23" font-family="'Courier New', Courier, monospace" font-size="20" xml:space="preserve">
+    <text x="70" y="40">                ooooooa</text>
+    <text x="70" y="62">             Qooooooooo</text>
+    <text x="70" y="84">           booooooooooo</text>
+    <text x="70" y="106">         aoooooo*oooooo</text>
+    <text x="70" y="128">       *oo*     ooooooo</text>
+    <text x="70" y="150">     ho*oo*     ooooooo</text>
+    <text x="70" y="172">     ooooo*     ooooooo</text>
+    <text x="70" y="194">     ooooo*     ooooooo</text>
+    <text x="70" y="216">     ooooo*     ooooooo</text>
+    <text x="70" y="238">     oooooooooooooooooa</text>
+    <text x="70" y="260">     ooooo ooooooo*</text>
+    <text x="70" y="282">     **h     aoooo*o*Q</text>
+    <text x="70" y="304">               *ooooooh</text>
+  </g>
+</svg>

@@ -1,0 +1,49 @@
+services:
+  ffmpeg-api:
+    image: ${FFMPEG_API_IMAGE:-rodscompany/ffmpeg-api:latest}
+    container_name: ${FFMPEG_API_CONTAINER_NAME:-ffmpeg-api}
+    restart: unless-stopped
+    ports:
+      - "${PUBLIC_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SERVER_PORT: 3000
+      EXTERNAL_PORT: ${EXTERNAL_PORT:-3000}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      FILE_SIZE_LIMIT_BYTES: ${FILE_SIZE_LIMIT_BYTES:-536870912}
+      KEEP_ALL_FILES: ${KEEP_ALL_FILES:-false}
+      ENABLE_SYNC_SMALL_JOBS: ${ENABLE_SYNC_SMALL_JOBS:-true}
+      SYNC_MAX_INPUT_BYTES: ${SYNC_MAX_INPUT_BYTES:-10485760}
+      JOB_CONCURRENCY: ${JOB_CONCURRENCY:-2}
+      MAX_QUEUE_SIZE: ${MAX_QUEUE_SIZE:-100}
+      JOB_RETENTION_MS: ${JOB_RETENTION_MS:-900000}
+      JOB_TIMEOUT_MS: ${JOB_TIMEOUT_MS:-3600000}
+      DOWNLOAD_TIMEOUT_MS: ${DOWNLOAD_TIMEOUT_MS:-60000}
+      URL_MAX_REDIRECTS: ${URL_MAX_REDIRECTS:-5}
+      ALLOW_PRIVATE_URLS: ${ALLOW_PRIVATE_URLS:-false}
+      JSON_BODY_LIMIT: ${JSON_BODY_LIMIT:-1mb}
+      AUDIO_ACTIVITY_NOISE_THRESHOLD_DB: ${AUDIO_ACTIVITY_NOISE_THRESHOLD_DB:--35}
+      AUDIO_ACTIVITY_MIN_SILENCE_DURATION: ${AUDIO_ACTIVITY_MIN_SILENCE_DURATION:-0.5}
+      AUDIO_ACTIVITY_MIN_SEGMENT_DURATION: ${AUDIO_ACTIVITY_MIN_SEGMENT_DURATION:-1.2}
+      AUDIO_ACTIVITY_MIN_ACTIVE_RATIO: ${AUDIO_ACTIVITY_MIN_ACTIVE_RATIO:-0.08}
+      AUDIO_ACTIVITY_USE_SPEECH_BAND: ${AUDIO_ACTIVITY_USE_SPEECH_BAND:-true}
+      SCALAR_THEME: ${SCALAR_THEME:-elysiajs}
+      SCALAR_TITLE: ${SCALAR_TITLE:-ffmpeg-api}
+      SCALAR_TELEMETRY: ${SCALAR_TELEMETRY:-true}
+      SCALAR_LAYOUT: ${SCALAR_LAYOUT:-modern}
+    volumes:
+      - ffmpeg_api_tmp:/tmp/ffmpeg-api
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/v1/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  ffmpeg_api_tmp:

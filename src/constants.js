@@ -13,10 +13,23 @@ function getEnumEnv(name, fallback, allowedValues) {
     return allowedValues.indexOf(value) !== -1 ? value : fallback;
 }
 
+function getStringEnv(name, fallback) {
+    return (process.env[name] || fallback || '').trim();
+}
+
+function normalizeBaseUrl(value) {
+    if (!value) {
+        return '';
+    }
+
+    return value.replace(/\/+$/, '');
+}
+
 exports.fileSizeLimit = getIntEnv('FILE_SIZE_LIMIT_BYTES', 536870912); // 512MB
 exports.defaultFFMPEGProcessPriority = 10;
 exports.serverPort = getIntEnv('SERVER_PORT', 3000);
 exports.externalPort = process.env.EXTERNAL_PORT;
+exports.publicBaseUrl = normalizeBaseUrl(getStringEnv('PUBLIC_BASE_URL', ''));
 exports.keepAllFiles = process.env.KEEP_ALL_FILES || "false";
 exports.nodeEnv = process.env.NODE_ENV || 'development';
 exports.enableSyncSmallJobs = getBoolEnv('ENABLE_SYNC_SMALL_JOBS', true);
@@ -38,3 +51,4 @@ exports.scalarTheme = process.env.SCALAR_THEME || 'elysiajs';
 exports.scalarTitle = process.env.SCALAR_TITLE || 'ffmpeg-api';
 exports.scalarTelemetry = getBoolEnv('SCALAR_TELEMETRY', true);
 exports.scalarLayout = getEnumEnv('SCALAR_LAYOUT', 'modern', ['modern', 'classic']);
+exports.showStartupBanner = getBoolEnv('SHOW_STARTUP_BANNER', true);

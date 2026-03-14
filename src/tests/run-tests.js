@@ -10,6 +10,7 @@ process.env.ALLOW_PRIVATE_URLS = 'true';
 process.env.ENABLE_SYNC_SMALL_JOBS = 'true';
 process.env.SYNC_MAX_INPUT_BYTES = '10485760';
 process.env.JOB_RETENTION_MS = '5000';
+process.env.SHOW_STARTUP_BANNER = 'false';
 
 const {startServer} = require('../app.js');
 
