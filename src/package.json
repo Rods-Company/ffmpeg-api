@@ -1,9 +1,11 @@
 {
   "name": "ffmpegapi",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "API for FFMPEG, media conversion utility",
   "main": "app.js",
-  "bin" : { "ffmpegapi" : "./app.js" },
+  "bin": {
+    "ffmpegapi": "./app.js"
+  },
   "scripts": {
     "start": "node app.js",
     "test": "node tests/run-tests.js"
