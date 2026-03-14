@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
   title: ffmpeg-api
-  version: 1.0.0
+  version: 1.1.0
   summary: Async-first media processing API powered by FFmpeg
   description: >
-    Draft OpenAPI contract for the next version of ffmpeg-api.
-    This specification is intended to be the source of truth for Scalar documentation.
+    Draft OpenAPI contract for the next version of ffmpeg-api. This
+    specification is intended to be the source of truth for Scalar
+    documentation.
   license:
     name: ISC
     identifier: ISC
@@ -25,12 +26,13 @@ security: []
 paths:
   /v1/jobs:
     post:
-      tags: [Jobs]
+      tags:
+        - Jobs
       operationId: createJob
       summary: Create a media processing job
       description: >
-        Creates an asynchronous processing job. Input may be provided as a remote URL
-        in JSON or as an uploaded file in multipart form data.
+        Creates an asynchronous processing job. Input may be provided as a
+        remote URL in JSON or as an uploaded file in multipart form data.
       requestBody:
         required: true
         content:
@@ -52,9 +54,9 @@ paths:
                       filename: episode-fast.ogg
                     operations:
                       - type: silence_trim
-                        startThreshold: -40dB
+                        startThreshold: '-40dB'
                         startDuration: 0.3
-                        stopThreshold: -40dB
+                        stopThreshold: '-40dB'
                         stopDuration: 0.5
                       - type: speed
                         factor: 1.25
@@ -93,7 +95,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /v1/jobs/{jobId}:
     get:
-      tags: [Jobs]
+      tags:
+        - Jobs
       operationId: getJob
       summary: Get job status
       parameters:
@@ -113,7 +116,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /v1/jobs/{jobId}/cancel:
     post:
-      tags: [Jobs]
+      tags:
+        - Jobs
       operationId: cancelJob
       summary: Cancel a queued or running job
       parameters:
@@ -139,7 +143,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /v1/jobs/{jobId}/artifact:
     get:
-      tags: [Jobs]
+      tags:
+        - Jobs
       operationId: downloadJobArtifact
       summary: Download the completed job artifact
       parameters:
@@ -166,13 +171,17 @@ paths:
                 $ref: '#/components/schemas/Error'
   /v1/analyze/audio-activity:
     post:
-      tags: [Analysis]
+      tags:
+        - Analysis
       operationId: analyzeAudioActivity
-      summary: Analyze whether audio is mostly silence or only low-value background activity
+      summary: >-
+        Analyze whether audio is mostly silence or only low-value background
+        activity
       description: >
         Runs a speech-band activity heuristic using FFmpeg silence detection.
-        This endpoint does not perform speech recognition. It is intended to detect
-        whether an audio file is likely background-only or contains foreground activity.
+        This endpoint does not perform speech recognition. It is intended to
+        detect whether an audio file is likely background-only or contains
+        foreground activity.
       requestBody:
         required: true
         content:
@@ -206,7 +215,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /v1/capabilities:
     get:
-      tags: [Capabilities]
+      tags:
+        - Capabilities
       operationId: getCapabilities
       summary: List runtime FFmpeg capabilities
       responses:
@@ -216,21 +226,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Capabilities'
-        '500':
-          description: Failed to collect capabilities
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         '401':
           description: Authentication required
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to collect capabilities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /v1/health:
     get:
-      tags: [Health]
+      tags:
+        - Health
       operationId: getHealth
       summary: Health check
       responses:
@@ -240,19 +251,20 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [status]
+                required:
+                  - status
                 properties:
                   status:
                     type: string
                     example: ok
-        '503':
-          description: Service is not ready
+        '401':
+          description: Authentication required
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '401':
-          description: Authentication required
+        '503':
+          description: Service is not ready
           content:
             application/json:
               schema:
@@ -269,11 +281,15 @@ components:
   schemas:
     UrlJobCreateRequest:
       type: object
-      required: [input, recipe]
+      required:
+        - input
+        - recipe
       properties:
         input:
           type: object
-          required: [type, url]
+          required:
+            - type
+            - url
           properties:
             type:
               type: string
@@ -287,11 +303,14 @@ components:
           $ref: '#/components/schemas/TransformRecipe'
     AudioActivityUrlRequest:
       type: object
-      required: [input]
+      required:
+        - input
       properties:
         input:
           type: object
-          required: [type, url]
+          required:
+            - type
+            - url
           properties:
             type:
               type: string
@@ -303,7 +322,8 @@ components:
           $ref: '#/components/schemas/AudioActivityOptions'
     AudioActivityUploadRequest:
       type: object
-      required: [file]
+      required:
+        - file
       properties:
         file:
           type: string
@@ -313,7 +333,9 @@ components:
           type: string
     UploadJobCreateRequest:
       type: object
-      required: [file, recipe]
+      required:
+        - file
+        - recipe
       properties:
         file:
           type: string
@@ -351,11 +373,14 @@ components:
           example: true
     TransformRecipe:
       type: object
-      required: [output, operations]
+      required:
+        - output
+        - operations
       properties:
         output:
           type: object
-          required: [container]
+          required:
+            - container
           properties:
             container:
               type: string
@@ -370,7 +395,8 @@ components:
             $ref: '#/components/schemas/Operation'
     Operation:
       type: object
-      required: [type]
+      required:
+        - type
       properties:
         type:
           type: string
@@ -390,14 +416,18 @@ components:
       additionalProperties: true
     JobAccepted:
       type: object
-      required: [id, status, links]
+      required:
+        - id
+        - status
+        - links
       properties:
         id:
           type: string
           format: uuid
         status:
           type: string
-          enum: [queued]
+          enum:
+            - queued
         links:
           type: object
           properties:
@@ -412,7 +442,11 @@ components:
               example: /v1/jobs/07d4a4a5-55f0-4c29-8790-b7546a9b2854/cancel
     Job:
       type: object
-      required: [id, status, createdAt, updatedAt]
+      required:
+        - id
+        - status
+        - createdAt
+        - updatedAt
       properties:
         id:
           type: string
@@ -565,7 +599,9 @@ components:
           type: number
     Error:
       type: object
-      required: [code, message]
+      required:
+        - code
+        - message
       properties:
         code:
           type: string
