@@ -1,6 +1,6 @@
 # ffmpeg API
 
-An async-first media processing API powered by FFMPEG.
+An async-first media processing API powered by FFMPEG and maintained by Rods Company.
 
 Sources: https://github.com/gnh1201/ffmpeg-api
 
@@ -11,28 +11,27 @@ Based on:
 - https://github.com/jrottenberg/ffmpeg 
 - https://github.com/fluent-ffmpeg/node-fluent-ffmpeg
 
-
-# Docs
+## 📚 Docs
 
 - [Interactive API reference](./docs)
 - [OpenAPI document](./openapi.yaml)
 - [Endpoint listing](./endpoints)
 
-# Quick Start
+## 🚀 Quick Start
 
 - Health check: `GET /v1/health`
 - Runtime capabilities: `GET /v1/capabilities`
 - Interactive docs: `GET /docs`
 - Create a job: `POST /v1/jobs`
 
-# API Model
+## ⚙️ API Model
 
 - The API is job-based and async-first.
 - Small inputs can run synchronously when `mode=sync` or when `mode=auto` matches the configured sync threshold.
 - Input can be sent as a remote URL in JSON or as multipart upload.
 - Transformations are described by a `recipe` object.
 
-# Important Note
+## 📝 Important Note
 
 The current `silence_trim` operation removes silent segments. It is not noise reduction.
 

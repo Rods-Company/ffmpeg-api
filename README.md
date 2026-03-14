@@ -1,6 +1,6 @@
 # ffmpeg-api
 
-`ffmpeg-api` is an async-first HTTP API for FFmpeg. It lets backend services upload a file or point to a URL, run a recipe of audio or video operations, and fetch the generated artifact either synchronously for small inputs or asynchronously through job polling.
+`ffmpeg-api` is an async-first HTTP API for FFmpeg maintained by Rods Company. It lets backend services upload a file or point to a URL, run a recipe of audio or video operations, and fetch the generated artifact either synchronously for small inputs or asynchronously through job polling.
 
 It is built for practical media workflows such as:
 
@@ -11,7 +11,7 @@ It is built for practical media workflows such as:
 - extracting audio from video
 - detecting whether an audio file is probably background-only
 
-## Why this API exists
+## 🚀 Overview
 
 FFmpeg is powerful, but wiring uploads, URL ingestion, polling, output storage, and safe runtime defaults into a service usually gets repeated in every project.
 
@@ -24,12 +24,21 @@ This API packages that into a single service with:
 - audio activity analysis
 - OpenAPI documentation rendered by Scalar
 
-## Public images
+## ✨ Features
+
+- upload or remote URL input
+- `sync`, `async`, and `auto` execution modes
+- queue-based parallel processing
+- recipe-driven transformations
+- audio activity analysis
+- OpenAPI documentation rendered by Scalar
+
+## 📦 Images
 
 - GHCR: `ghcr.io/rods-company/ffmpeg-api`
 - Docker Hub: `<your-dockerhub-namespace>/ffmpeg-api`
 
-## Documentation
+## 📚 Docs
 
 - `GET /docs` for the interactive Scalar API reference
 - `GET /openapi.yaml` for the raw OpenAPI contract
@@ -38,7 +47,7 @@ This API packages that into a single service with:
 - [docs/release-guide.md](docs/release-guide.md) for the release model
 - [CONTRIBUTING.md](CONTRIBUTING.md) for commit and PR conventions
 
-## Endpoints
+## 🔌 API
 
 - `GET /` service landing page
 - `GET /docs` interactive API documentation
@@ -52,7 +61,7 @@ This API packages that into a single service with:
 - `POST /v1/jobs/:jobId/cancel` cancel a queued or running job
 - `GET /v1/jobs/:jobId/artifact` download the completed output file
 
-## API model
+## ⚙️ Execution Model
 
 - URL input uses `application/json`
 - upload input uses `multipart/form-data`
@@ -60,9 +69,9 @@ This API packages that into a single service with:
 - small inputs can be processed synchronously when `ENABLE_SYNC_SMALL_JOBS=true`
 - `analysis.audioActivity` can be enabled inside `POST /v1/jobs` to avoid sending the same file twice
 
-## Running
+## ▶️ Running
 
-### Run with Docker
+### 🐳 Docker
 
 Build the image from the repository root:
 
@@ -93,7 +102,7 @@ After the container starts:
 - OpenAPI: `http://127.0.0.1:3000/openapi.yaml`
 - Health check: `http://127.0.0.1:3000/v1/health`
 
-### Run locally
+### 💻 Local
 
 Install dependencies inside `src/`:
 
@@ -110,7 +119,7 @@ npm start
 
 If you want custom settings locally, create `src/.env` or export variables before starting the server.
 
-### Run in Dockploy
+### ☁️ Dockploy
 
 For Dockploy or any container platform that supports environment variables:
 
@@ -120,7 +129,7 @@ For Dockploy or any container platform that supports environment variables:
 - override only the values you actually need
 - keep `ALLOW_PRIVATE_URLS=false` unless you have a controlled private-network use case
 
-## Environment variables
+## 🌍 Environment
 
 The new `v1` job API is configurable through environment variables and all of them have defaults. For Docker, Dockploy, or Compose-style deployments, see [.env.example](.env.example).
 
@@ -141,7 +150,7 @@ The new `v1` job API is configurable through environment variables and all of th
 - `AUDIO_ACTIVITY_MIN_ACTIVE_RATIO=0.08` minimum active ratio required to avoid being classified as background-only
 - `AUDIO_ACTIVITY_USE_SPEECH_BAND=true` applies a speech-band filter before silence detection
 
-## Usage
+## 🧪 Usage
 
 Input media can be anything that FFmpeg supports. `.ogg` is a first-class supported output format in the API examples and tests.
 
@@ -240,7 +249,7 @@ This endpoint does not recognize speech. It uses a speech-band activity heuristi
 - `silenceSegments`
 - `activeSegments`
 
-## Release automation
+## 🏷️ Release Automation
 
 The repository is set up to automate releases from Conventional Commits.
 
@@ -252,12 +261,12 @@ The repository is set up to automate releases from Conventional Commits.
 
 If you use squash merge, the pull request title becomes especially important because it usually becomes the final commit message on the default branch.
 
-## Notes
+## 📝 Notes
 
 - `silence_trim` removes silent sections. It is not noise reduction.
 - `audio-activity` is a heuristic analysis. It is not speech recognition.
 
-## Origins
+## 🙏 Origins
 
 Originally developed by [Paul Visco @surebert](https://github.com/surebert).
 
