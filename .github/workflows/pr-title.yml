@@ -15,7 +15,8 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          if [[ ! "$PR_TITLE" =~ ^(feat|fix|refactor|perf|docs|test|build|ci|chore)(\([^)]+\))?(!)?:\ .+ ]]; then
+          REGEX='^(feat|fix|refactor|perf|docs|test|build|ci|chore)(\([^)]+\))?(!)?: .+'
+          if ! printf '%s\n' "$PR_TITLE" | grep -Eq "$REGEX"; then
             echo "Invalid PR title: $PR_TITLE"
             echo "Use Conventional Commits, for example: feat: add ogg upload support"
             exit 1
