@@ -5,6 +5,9 @@ on:
     branches: [ "main", "master" ]
     paths:
       - "README.md"
+  workflow_run:
+    workflows: [ "Release" ]
+    types: [ completed ]
   workflow_dispatch:
 
 env:
@@ -12,9 +15,12 @@ env:
 
 jobs:
   sync-description:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
 
       - name: Check Docker Hub configuration
         id: dockerhub_config
@@ -36,5 +42,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ vars.DOCKERHUB_NAMESPACE }}/ffmpeg-api
+          readme-filepath: ./README.md
           short-description: ${{ github.event.repository.description }}
           enable-url-completion: true
