@@ -43,6 +43,7 @@ This API packages that into a single service with:
 - `GET /docs` for the interactive Scalar API reference
 - `GET /openapi.yaml` for the raw OpenAPI contract
 - [CHANGELOG.md](CHANGELOG.md) for generated release history
+- [docs/environment-reference.md](docs/environment-reference.md) for the full environment variable reference
 - [docs/transformation-roadmap.md](docs/transformation-roadmap.md) for implementation and release direction
 - [docs/release-guide.md](docs/release-guide.md) for the release model
 - [CONTRIBUTING.md](CONTRIBUTING.md) for commit and PR conventions
@@ -144,6 +145,8 @@ The compose file also mounts a named volume at `/tmp/ffmpeg-api` so temporary ar
 ## 🌍 Environment
 
 The new `v1` job API is configurable through environment variables and all of them have defaults. For Docker, Dockploy, or Compose-style deployments, see [.env.example](.env.example).
+
+For the full explanation of every variable, including defaults, tradeoffs, and when to change them, see [docs/environment-reference.md](docs/environment-reference.md).
 
 - `SERVER_PORT=3000` internal HTTP port used by the service
 - `EXTERNAL_PORT=3000` external/public port exposed by the deployment
