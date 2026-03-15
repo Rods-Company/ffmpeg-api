@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ffmpeg-api
-  version: 1.1.0
+  version: 1.1.1
   summary: Async-first media processing API powered by FFmpeg
   description: >
     Draft OpenAPI contract for the next version of ffmpeg-api. This
