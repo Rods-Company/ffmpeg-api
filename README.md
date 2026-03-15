@@ -43,6 +43,7 @@ This API packages that into a single service with:
 - `GET /docs` for the interactive Scalar API reference
 - `GET /openapi.yaml` for the raw OpenAPI contract
 - [CHANGELOG.md](CHANGELOG.md) for generated release history
+- [docs/environment-reference.md](docs/environment-reference.md) for the full environment variable reference
 - [docs/transformation-roadmap.md](docs/transformation-roadmap.md) for implementation and release direction
 - [docs/release-guide.md](docs/release-guide.md) for the release model
 - [CONTRIBUTING.md](CONTRIBUTING.md) for commit and PR conventions
@@ -145,6 +146,8 @@ The compose file also mounts a named volume at `/tmp/ffmpeg-api` so temporary ar
 
 The new `v1` job API is configurable through environment variables and all of them have defaults. For Docker, Dockploy, or Compose-style deployments, see [.env.example](.env.example).
 
+For the full explanation of every variable, including defaults, tradeoffs, and when to change them, see [docs/environment-reference.md](docs/environment-reference.md).
+
 - `SERVER_PORT=3000` internal HTTP port used by the service
 - `EXTERNAL_PORT=3000` external/public port exposed by the deployment
 - `PUBLIC_BASE_URL=` optional full public base URL used in startup links, for example `https://ffmpeg-api.rods.company`
@@ -168,6 +171,13 @@ The new `v1` job API is configurable through environment variables and all of th
 ## 🧪 Usage
 
 Input media can be anything that FFmpeg supports. `.ogg` is a first-class supported output format in the API examples and tests.
+
+You can send media in two ways:
+
+- by URL with `application/json`
+- by direct file upload with `multipart/form-data`
+
+For uploads, use a file field named `file`.
 
 ### Sync request from URL
 
@@ -203,6 +213,17 @@ When `analysis.audioActivity` is enabled in synchronous mode, the API returns th
 - `X-Audio-Activity-Background-Only`
 - `X-Audio-Activity-Contains-Speech-Like-Activity`
 - `X-Audio-Activity-Active-Ratio`
+
+### Sync request from upload
+
+```bash
+curl -X POST http://127.0.0.1:3000/v1/jobs \
+  -F "file=@./input.ogg" \
+  -F "mode=sync" \
+  -F "analysis={\"audioActivity\":true}" \
+  -F "recipe={\"output\":{\"container\":\"ogg\",\"filename\":\"output.ogg\"},\"operations\":[{\"type\":\"speed\",\"factor\":1.2}]}" \
+  -o output.ogg
+```
 
 ### Async request from URL
 
@@ -243,6 +264,16 @@ curl -X POST http://127.0.0.1:3000/v1/jobs \
 
 When `analysis.audioActivity` is enabled for an async job, the diagnostic is attached to the job payload in the `analysis.audioActivity` field.
 
+### Async request from upload
+
+```bash
+curl -X POST http://127.0.0.1:3000/v1/jobs \
+  -F "file=@./input.ogg" \
+  -F "mode=async" \
+  -F "analysis={\"audioActivity\":true}" \
+  -F "recipe={\"output\":{\"container\":\"ogg\",\"filename\":\"output.ogg\"},\"operations\":[{\"type\":\"silence_trim\"},{\"type\":\"speed\",\"factor\":1.2}]}"
+```
+
 ### Analyze whether audio is probably background-only
 
 ```bash
@@ -263,6 +294,14 @@ This endpoint does not recognize speech. It uses a speech-band activity heuristi
 - `likelyContainsSpeechLikeActivity`
 - `silenceSegments`
 - `activeSegments`
+
+### Analyze an uploaded file
+
+```bash
+curl -X POST http://127.0.0.1:3000/v1/analyze/audio-activity \
+  -F "file=@./input.ogg" \
+  -F "options={\"minActiveRatio\":0.08,\"minSegmentDuration\":1.2}"
+```
 
 ## 🏷️ Release Automation
 

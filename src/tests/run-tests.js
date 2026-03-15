@@ -33,6 +33,7 @@ async function main() {
     await setup();
 
     await testHealth();
+    await testOpenApiServer();
     await testDocs();
     await testSyncJob();
     await testAsyncJob();
@@ -143,7 +144,16 @@ async function testHealth() {
 
     assert.equal(response.status, 200);
     assert.equal(body.status, 'ok');
+    assert.equal(body.publicBaseUrl, apiBaseUrl);
     assert.equal(body.syncSmallJobsEnabled, true);
+}
+
+async function testOpenApiServer() {
+    const response = await fetch(`${apiBaseUrl}/openapi.yaml`);
+    const body = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(body, new RegExp(`url: 'http://127\\.0\\.0\\.1:${apiServer.address().port}'`));
 }
 
 async function testDocs() {

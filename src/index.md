@@ -9,6 +9,7 @@ An async-first media processing API powered by FFMPEG and maintained by Rods Com
 - Interactive docs: `GET /docs`
 - Raw OpenAPI: `GET /openapi.yaml`
 - Create a job: `POST /v1/jobs`
+- Uploads use `multipart/form-data` with a file field named `file`
 
 ## ✨ What It Does
 
