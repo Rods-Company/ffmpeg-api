@@ -6,6 +6,7 @@ const logger = require('../utils/logger.js');
 const utils = require('../utils/utils.js');
 const {downloadToFile} = require('./input-fetcher.js');
 const {runProcessing} = require('./media-processor.js');
+const {createChunksArchive} = require('./chunk-service.js');
 const {analyzeAudioActivity} = require('./audio-activity-analyzer.js');
 const {createValidationError} = require('./recipe-validator.js');
 const {resolveTempPath} = require('./temp-path.js');
@@ -22,11 +23,13 @@ function createJob(payload) {
     const now = new Date().toISOString();
     const job = {
         id: crypto.randomBytes(16).toString('hex'),
+        kind: payload.kind || 'processing',
         status: 'queued',
         createdAt: now,
         updatedAt: now,
         input: payload.input,
         recipe: payload.recipe,
+        chunkRequest: payload.chunkRequest || null,
         analysisRequest: payload.analysis || {},
         analysis: null,
         mode: payload.mode,
@@ -179,7 +182,9 @@ async function runJob(job) {
         };
 
         const processingStartedAt = Date.now();
-        const artifact = await runProcessing(inputFile, job.recipe, job);
+        const artifact = job.kind === 'chunking' ?
+            await createChunksArchive(inputFile, job.chunkRequest, job) :
+            await runProcessing(inputFile, job.recipe, job);
         const outputStats = fs.statSync(artifact.filePath);
 
         job.metrics.processingMs = Date.now() - processingStartedAt;
@@ -253,11 +258,13 @@ function cleanupArtifact(job) {
 function sanitizeJob(job) {
     return {
         id: job.id,
+        kind: job.kind,
         status: job.status,
         createdAt: job.createdAt,
         updatedAt: job.updatedAt,
         input: buildPublicInput(job.input),
         recipe: job.recipe,
+        chunkRequest: job.chunkRequest,
         analysis: job.analysis,
         progress: job.progress,
         artifact: job.artifact ? {
@@ -265,6 +272,7 @@ function sanitizeJob(job) {
             contentType: job.artifact.contentType,
             sizeBytes: job.artifact.sizeBytes,
             downloadUrl: job.artifact.downloadUrl,
+            chunkCount: job.artifact.chunkCount || null,
         } : null,
         error: job.error,
         metrics: job.metrics,

@@ -5,7 +5,7 @@ const constants = require('../constants.js');
 function analyzeAudioActivity(filePath, options) {
     const settings = buildSettings(options);
 
-    return getDuration(filePath).then(function(durationSeconds) {
+    return getDurationSeconds(filePath).then(function(durationSeconds) {
         return runSilenceDetect(filePath, settings).then(function(output) {
             const silenceSegments = parseSilenceSegments(output, durationSeconds);
             const activeSegments = buildActiveSegments(silenceSegments, durationSeconds);
@@ -51,7 +51,7 @@ function buildSettings(options) {
     };
 }
 
-function getDuration(filePath) {
+function getDurationSeconds(filePath) {
     return new Promise(function(resolve, reject) {
         execFile('ffprobe', [
             '-v', 'error',
@@ -175,4 +175,5 @@ function numberOrDefault(value, fallback) {
 
 module.exports = {
     analyzeAudioActivity,
+    getDurationSeconds,
 };

@@ -4,6 +4,7 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 const {execFileSync} = require('child_process');
+const AdmZip = require('adm-zip');
 
 process.env.LOG_LEVEL = 'error';
 process.env.ALLOW_PRIVATE_URLS = 'true';
@@ -34,9 +35,15 @@ async function main() {
 
     await testHealth();
     await testOpenApiServer();
+    await testRootRedirect();
     await testDocs();
     await testSyncJob();
     await testAsyncJob();
+    await testSyncChunkUpload();
+    await testSyncChunkUploadWithFlattenedMultipartFields();
+    await testAsyncSilenceChunkJob();
+    await testAsyncSilenceChunkJobWithMaxDuration();
+    await testDurationChunksPreferNearbySilence();
     await testMultipartUploadJob();
     await testExtractAudioJob();
     await testSyncJobWithAudioActivityHeaders();
@@ -165,8 +172,17 @@ async function testDocs() {
     assert.match(body, /ffmpeg-api/i);
 }
 
+async function testRootRedirect() {
+    const response = await fetch(`${apiBaseUrl}/`, {
+        redirect: 'manual',
+    });
+
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get('location'), '/docs');
+}
+
 async function testSyncJob() {
-    const response = await fetch(`${apiBaseUrl}/v1/jobs`, {
+    const response = await fetch(`${apiBaseUrl}/v1/jobs/url`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -199,7 +215,7 @@ async function testSyncJob() {
 }
 
 async function testAsyncJob() {
-    const createResponse = await fetch(`${apiBaseUrl}/v1/jobs`, {
+    const createResponse = await fetch(`${apiBaseUrl}/v1/jobs/url`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -266,7 +282,7 @@ async function testMultipartUploadJob() {
     }));
     form.append('mode', 'sync');
 
-    const response = await fetch(`${apiBaseUrl}/v1/jobs`, {
+    const response = await fetch(`${apiBaseUrl}/v1/jobs/upload`, {
         method: 'POST',
         body: form,
     });
@@ -277,8 +293,198 @@ async function testMultipartUploadJob() {
     assert.ok(buffer.length > 0);
 }
 
+async function testSyncChunkUpload() {
+    const form = new FormData();
+    form.append('file', new Blob([fs.readFileSync(samplePath)]), 'upload-tone.wav');
+    form.append('mode', 'sync');
+    form.append('output', JSON.stringify({
+        container: 'ogg',
+        filenamePrefix: 'tone-part',
+        archiveName: 'tone-parts.zip',
+    }));
+    form.append('chunking', JSON.stringify({
+        strategy: 'parts',
+        parts: 2,
+    }));
+
+    const response = await fetch(`${apiBaseUrl}/v1/chunks/upload`, {
+        method: 'POST',
+        body: form,
+    });
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type') || '', /(application\/zip|application\/octet-stream)/);
+    assert.equal(response.headers.get('x-chunk-count'), '2');
+    assert.ok(buffer.length > 0);
+}
+
+async function testSyncChunkUploadWithFlattenedMultipartFields() {
+    const form = new FormData();
+    form.append('file', new Blob([fs.readFileSync(samplePath)]), 'upload-tone.wav');
+    form.append('mode', 'sync');
+    form.append('container', 'ogg');
+    form.append('filenamePrefix', 'flat-part');
+    form.append('archiveName', 'flat-parts.zip');
+    form.append('strategy', 'parts');
+    form.append('parts', '"2"');
+
+    const response = await fetch(`${apiBaseUrl}/v1/chunks/upload`, {
+        method: 'POST',
+        body: form,
+    });
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('x-chunk-count'), '2');
+    assert.ok(buffer.length > 0);
+}
+
+async function testAsyncSilenceChunkJob() {
+    const createResponse = await fetch(`${apiBaseUrl}/v1/chunks/url`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+            mode: 'async',
+            input: {
+                type: 'url',
+                url: `${assetBaseUrl}/bursts.wav`,
+            },
+            output: {
+                container: 'ogg',
+                filenamePrefix: 'speech-like',
+                archiveName: 'speech-like.zip',
+            },
+            chunking: {
+                strategy: 'silence',
+                minSilenceDuration: 0.4,
+                paddingBeforeSeconds: 0.1,
+                paddingAfterSeconds: 0.1,
+                minChunkDurationSeconds: 1.0,
+                mergeGapSeconds: 0.1,
+            },
+        }),
+    });
+    const created = await createResponse.json();
+
+    assert.equal(createResponse.status, 202);
+    assert.ok(created.id);
+
+    let job = null;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+        await sleep(250);
+        const statusResponse = await fetch(`${apiBaseUrl}/v1/jobs/${created.id}`);
+        job = await statusResponse.json();
+        if (job.status === 'completed' || job.status === 'failed') {
+            break;
+        }
+    }
+
+    assert.ok(job);
+    assert.equal(job.kind, 'chunking');
+    assert.equal(job.status, 'completed');
+    assert.equal(job.artifact.filename, 'speech-like.zip');
+    assert.equal(job.artifact.chunkCount, 3);
+
+    const artifactResponse = await fetch(`${apiBaseUrl}${job.artifact.downloadUrl}`);
+    const artifactBuffer = Buffer.from(await artifactResponse.arrayBuffer());
+    assert.equal(artifactResponse.status, 200);
+    assert.ok(artifactBuffer.length > 0);
+}
+
+async function testAsyncSilenceChunkJobWithMaxDuration() {
+    const createResponse = await fetch(`${apiBaseUrl}/v1/chunks/url`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+            mode: 'async',
+            input: {
+                type: 'url',
+                url: `${assetBaseUrl}/bursts.wav`,
+            },
+            output: {
+                container: 'ogg',
+                filenamePrefix: 'speech-bounded',
+                archiveName: 'speech-bounded.zip',
+            },
+            chunking: {
+                strategy: 'silence',
+                minSilenceDuration: 0.4,
+                paddingBeforeSeconds: 0.1,
+                paddingAfterSeconds: 0.1,
+                minChunkDurationSeconds: 0.5,
+                maxChunkDurationSeconds: 1.0,
+                mergeGapSeconds: 0.1,
+            },
+        }),
+    });
+    const created = await createResponse.json();
+
+    assert.equal(createResponse.status, 202);
+    assert.ok(created.id);
+
+    let job = null;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+        await sleep(250);
+        const statusResponse = await fetch(`${apiBaseUrl}/v1/jobs/${created.id}`);
+        job = await statusResponse.json();
+        if (job.status === 'completed' || job.status === 'failed') {
+            break;
+        }
+    }
+
+    assert.ok(job);
+    assert.equal(job.status, 'completed');
+    assert.equal(job.artifact.chunkCount, 6);
+}
+
+async function testDurationChunksPreferNearbySilence() {
+    const response = await fetch(`${apiBaseUrl}/v1/chunks/url`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+            mode: 'sync',
+            input: {
+                type: 'url',
+                url: `${assetBaseUrl}/bursts.wav`,
+            },
+            output: {
+                container: 'ogg',
+                filenamePrefix: 'aligned',
+                archiveName: 'aligned.zip',
+            },
+            chunking: {
+                strategy: 'duration',
+                segmentDuration: 2,
+                minSilenceDuration: 0.4,
+                paddingBeforeSeconds: 0.8,
+                paddingAfterSeconds: 0.8,
+            },
+        }),
+    });
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    assert.equal(response.status, 200);
+    assert.ok(buffer.length > 0);
+
+    const archive = new AdmZip(buffer);
+    const manifestEntry = archive.getEntry('manifest.json');
+    assert.ok(manifestEntry);
+    const manifest = JSON.parse(manifestEntry.getData().toString('utf8'));
+    assert.equal(manifest.chunkCount, 5);
+    assert.ok(Math.abs(manifest.chunks[0].end - 2) > 0.05);
+    assert.ok(Math.abs(manifest.chunks[1].end - 4) > 0.05);
+    assert.ok(Math.abs(manifest.chunks[3].end - 8) > 0.05);
+}
+
 async function testExtractAudioJob() {
-    const response = await fetch(`${apiBaseUrl}/v1/jobs`, {
+    const response = await fetch(`${apiBaseUrl}/v1/jobs/url`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -310,7 +516,7 @@ async function testExtractAudioJob() {
 }
 
 async function testBackgroundOnlyAnalysis() {
-    const response = await fetch(`${apiBaseUrl}/v1/analyze/audio-activity`, {
+    const response = await fetch(`${apiBaseUrl}/v1/analyze/audio-activity/url`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -330,7 +536,7 @@ async function testBackgroundOnlyAnalysis() {
 }
 
 async function testForegroundActivityAnalysis() {
-    const response = await fetch(`${apiBaseUrl}/v1/analyze/audio-activity`, {
+    const response = await fetch(`${apiBaseUrl}/v1/analyze/audio-activity/url`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -354,7 +560,7 @@ async function testForegroundActivityAnalysis() {
 }
 
 async function testStructuredValidationError() {
-    const response = await fetch(`${apiBaseUrl}/v1/jobs`, {
+    const response = await fetch(`${apiBaseUrl}/v1/jobs/url`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -385,7 +591,7 @@ async function testStructuredValidationError() {
 }
 
 async function testSyncJobWithAudioActivityHeaders() {
-    const response = await fetch(`${apiBaseUrl}/v1/jobs`, {
+    const response = await fetch(`${apiBaseUrl}/v1/jobs/url`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -423,7 +629,7 @@ async function testSyncJobWithAudioActivityHeaders() {
 }
 
 async function testAsyncJobWithAttachedAudioActivity() {
-    const createResponse = await fetch(`${apiBaseUrl}/v1/jobs`, {
+    const createResponse = await fetch(`${apiBaseUrl}/v1/jobs/url`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',

@@ -3,11 +3,12 @@ const Busboy = require('busboy');
 
 const constants = require('../constants.js');
 const logger = require('../utils/logger.js');
-const {createValidationError, normalizeMode, validateRecipe} = require('./recipe-validator.js');
+const {createValidationError, normalizeMode} = require('./recipe-validator.js');
+const {validateChunkRequest} = require('./chunk-validator.js');
 const {assignNestedField, readMultipartValue} = require('./multipart-fields.js');
 const {createTempPath} = require('./temp-path.js');
 
-function parseCreateJobRequest(req) {
+function parseCreateChunkRequest(req) {
     if (req.is('application/json')) {
         return parseJsonRequest(req);
     }
@@ -25,14 +26,15 @@ function parseJsonRequest(req) {
         throw createValidationError('application/json requests must provide input.type=url and input.url');
     }
 
+    const chunkRequest = validateChunkRequest(body, body.input.url);
     return Promise.resolve({
+        kind: 'chunking',
         input: {
             type: 'url',
             url: body.input.url,
         },
-        recipe: validateRecipe(body.recipe),
-        analysis: normalizeAnalysisRequest(body.analysis || {}),
-        mode: normalizeMode(body.mode),
+        chunkRequest: chunkRequest,
+        mode: normalizeMode(body.mode || chunkRequest.mode),
         sizeBytes: null,
     });
 }
@@ -40,19 +42,19 @@ function parseJsonRequest(req) {
 function parseMultipartRequest(req) {
     return new Promise(function(resolve, reject) {
         let bytes = 0;
-        let recipe = null;
-        let analysis = null;
+        let chunking = null;
+        let output = null;
         let mode = 'auto';
         const rawFields = {};
         let hasFile = false;
         let originalFileName = null;
-        let savedFile = createTempPath('v1-upload');
+        let savedFile = createTempPath('v1-chunks-upload');
         let settled = false;
 
         const busboy = new Busboy({
             headers: req.headers,
             limits: {
-                fields: 100,
+                fields: 50,
                 files: 1,
                 fileSize: constants.fileSizeLimit,
             },
@@ -60,12 +62,12 @@ function parseMultipartRequest(req) {
 
         busboy.on('field', function(fieldName, value) {
             assignNestedField(rawFields, fieldName, value);
-            if (fieldName === 'recipe') {
-                recipe = value;
+            if (fieldName === 'chunking') {
+                chunking = value;
                 return;
             }
-            if (fieldName === 'analysis') {
-                analysis = value;
+            if (fieldName === 'output') {
+                output = value;
                 return;
             }
             if (fieldName === 'mode') {
@@ -84,7 +86,7 @@ function parseMultipartRequest(req) {
             hasFile = true;
             originalFileName = filename;
             savedFile = `${savedFile}-${filename || 'upload'}`;
-            logger.debug(`uploading v1 file ${savedFile}`);
+            logger.debug(`uploading v1 chunks file ${savedFile}`);
 
             file.on('limit', function() {
                 file.resume();
@@ -113,25 +115,30 @@ function parseMultipartRequest(req) {
                     throw createValidationError('multipart upload must include a file field named "file"');
                 }
 
-                const recipeValue = readMultipartValue(rawFields, 'recipe', recipe ? JSON.parse(recipe) : null);
-                const analysisValue = readMultipartValue(rawFields, 'analysis', analysis ? JSON.parse(analysis) : {});
+                const outputValue = resolveOutputValue(rawFields, output);
+                const chunkingValue = resolveChunkingValue(rawFields, chunking);
                 const modeValue = readMultipartValue(rawFields, 'mode', mode);
 
-                if (!recipeValue) {
-                    throw createValidationError('multipart upload must include a recipe field');
+                if (!chunkingValue) {
+                    throw createValidationError('multipart upload must include a chunking field');
                 }
 
-                const parsedRecipe = validateRecipe(recipeValue);
+                const chunkRequest = validateChunkRequest({
+                    mode: modeValue,
+                    output: outputValue || {},
+                    chunking: chunkingValue,
+                }, originalFileName);
+
                 settled = true;
                 resolve({
+                    kind: 'chunking',
                     input: {
                         type: 'upload',
                         filePath: savedFile,
                         originalFileName: originalFileName,
                     },
-                    recipe: parsedRecipe,
-                    analysis: normalizeAnalysisRequest(analysisValue || {}),
-                    mode: normalizeMode(modeValue),
+                    chunkRequest: chunkRequest,
+                    mode: normalizeMode(modeValue || chunkRequest.mode),
                     sizeBytes: bytes,
                 });
             } catch (error) {
@@ -153,6 +160,60 @@ function parseMultipartRequest(req) {
     });
 }
 
+function resolveOutputValue(rawFields, output) {
+    const directValue = readMultipartValue(rawFields, 'output', output ? JSON.parse(output) : null);
+    if (directValue && typeof directValue === 'object' && !Array.isArray(directValue)) {
+        return directValue;
+    }
+
+    const aliases = {};
+    if (rawFields.container !== undefined) {
+        aliases.container = rawFields.container;
+    }
+    if (rawFields.filenamePrefix !== undefined) {
+        aliases.filenamePrefix = rawFields.filenamePrefix;
+    }
+    if (rawFields.archiveName !== undefined) {
+        aliases.archiveName = rawFields.archiveName;
+    }
+
+    return Object.keys(aliases).length > 0 ? aliases : {};
+}
+
+function resolveChunkingValue(rawFields, chunking) {
+    const directValue = readMultipartValue(rawFields, 'chunking', chunking ? JSON.parse(chunking) : null);
+    if (directValue && typeof directValue === 'object' && !Array.isArray(directValue)) {
+        return directValue;
+    }
+
+    const strategy = rawFields.strategy;
+    if (strategy === undefined) {
+        return directValue;
+    }
+
+    const aliases = {
+        strategy: strategy,
+    };
+
+    copyAlias(rawFields, aliases, 'parts');
+    copyAlias(rawFields, aliases, 'segmentDuration');
+    copyAlias(rawFields, aliases, 'noiseThresholdDb');
+    copyAlias(rawFields, aliases, 'minSilenceDuration');
+    copyAlias(rawFields, aliases, 'paddingBeforeSeconds');
+    copyAlias(rawFields, aliases, 'paddingAfterSeconds');
+    copyAlias(rawFields, aliases, 'minChunkDurationSeconds');
+    copyAlias(rawFields, aliases, 'mergeGapSeconds');
+    copyAlias(rawFields, aliases, 'useSpeechBand');
+
+    return aliases;
+}
+
+function copyAlias(source, target, key) {
+    if (source[key] !== undefined) {
+        target[key] = source[key];
+    }
+}
+
 function safeDelete(filePath) {
     try {
         if (filePath && fs.existsSync(filePath)) {
@@ -163,32 +224,8 @@ function safeDelete(filePath) {
     }
 }
 
-function normalizeAnalysisRequest(analysis) {
-    if (!analysis || typeof analysis !== 'object' || Array.isArray(analysis)) {
-        return {};
-    }
-
-    const normalized = {};
-    if (analysis.audioActivity === true) {
-        normalized.audioActivity = {
-            enabled: true,
-            options: {},
-        };
-        return normalized;
-    }
-
-    if (analysis.audioActivity && typeof analysis.audioActivity === 'object' && !Array.isArray(analysis.audioActivity)) {
-        normalized.audioActivity = {
-            enabled: true,
-            options: analysis.audioActivity,
-        };
-    }
-
-    return normalized;
-}
-
 module.exports = {
-    parseCreateJobRequest,
+    parseCreateChunkRequest,
     parseJsonRequest,
     parseMultipartRequest,
 };

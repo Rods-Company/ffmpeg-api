@@ -4,19 +4,38 @@ const fs = require('fs');
 const constants = require('../../constants.js');
 const logger = require('../../utils/logger.js');
 const {downloadToFile} = require('../../services/input-fetcher.js');
-const {parseAudioActivityRequest} = require('../../services/analysis-parser.js');
+const {
+    parseJsonRequest,
+    parseMultipartRequest,
+} = require('../../services/analysis-parser.js');
 const {analyzeAudioActivity} = require('../../services/audio-activity-analyzer.js');
 const {resolveTempPath} = require('../../services/temp-path.js');
 
 const router = express.Router();
 
-router.post('/audio-activity', async function(req, res, next) {
+router.post('/audio-activity/url', async function(req, res, next) {
+    try {
+        const payload = await parseJsonRequest(req);
+        return analyzeFromPayload(payload, res, next);
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/audio-activity/upload', async function(req, res, next) {
+    try {
+        const payload = await parseMultipartRequest(req);
+        return analyzeFromPayload(payload, res, next);
+    } catch (error) {
+        next(error);
+    }
+});
+
+async function analyzeFromPayload(payload, res, next) {
     let inputFilePath = null;
     let cleanupDownload = false;
-    let payload = null;
 
     try {
-        payload = await parseAudioActivityRequest(req);
         inputFilePath = payload.input.filePath;
 
         if (payload.input.type === 'url') {
@@ -46,7 +65,7 @@ router.post('/audio-activity', async function(req, res, next) {
             cleanupPath(inputFilePath);
         }
     }
-});
+}
 
 function buildPublicInput(input) {
     if (input.type === 'url') {
