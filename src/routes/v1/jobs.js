@@ -8,31 +8,25 @@ const {downloadToFile} = require('../../services/input-fetcher.js');
 const jobService = require('../../services/job-service.js');
 const {runProcessing} = require('../../services/media-processor.js');
 const {analyzeAudioActivity} = require('../../services/audio-activity-analyzer.js');
-const {parseCreateJobRequest} = require('../../services/request-parser.js');
+const {parseJsonRequest, parseMultipartRequest} = require('../../services/request-parser.js');
 const {createValidationError} = require('../../services/recipe-validator.js');
 const {resolveTempPath} = require('../../services/temp-path.js');
 
 const router = express.Router();
 
-router.post('/', async function(req, res, next) {
+router.post('/url', async function(req, res, next) {
     try {
-        const payload = await parseCreateJobRequest(req);
-        const shouldRunSync = canRunSync(payload);
+        const payload = await parseJsonRequest(req);
+        return createJobFromPayload(payload, req, res, next);
+    } catch (error) {
+        next(error);
+    }
+});
 
-        if (shouldRunSync) {
-            return runSync(payload, req, res, next);
-        }
-
-        const job = jobService.createJob(payload);
-        return res.status(202).send({
-            id: job.id,
-            status: job.status,
-            links: {
-                self: `/v1/jobs/${job.id}`,
-                artifact: `/v1/jobs/${job.id}/artifact`,
-                cancel: `/v1/jobs/${job.id}/cancel`,
-            },
-        });
+router.post('/upload', async function(req, res, next) {
+    try {
+        const payload = await parseMultipartRequest(req);
+        return createJobFromPayload(payload, req, res, next);
     } catch (error) {
         next(error);
     }
@@ -67,6 +61,25 @@ router.get('/:jobId/artifact', function(req, res, next) {
         next(error);
     }
 });
+
+function createJobFromPayload(payload, req, res, next) {
+    const shouldRunSync = canRunSync(payload);
+
+    if (shouldRunSync) {
+        return runSync(payload, req, res, next);
+    }
+
+    const job = jobService.createJob(payload);
+    return res.status(202).send({
+        id: job.id,
+        status: job.status,
+        links: {
+            self: `/v1/jobs/${job.id}`,
+            artifact: `/v1/jobs/${job.id}/artifact`,
+            cancel: `/v1/jobs/${job.id}/cancel`,
+        },
+    });
+}
 
 function canRunSync(payload) {
     if (!constants.enableSyncSmallJobs) {

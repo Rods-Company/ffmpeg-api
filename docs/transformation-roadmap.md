@@ -27,10 +27,15 @@ It supports:
 
 ### Core API
 
-- [x] `POST /v1/jobs`
+- [x] `POST /v1/jobs/url`
+- [x] `POST /v1/jobs/upload`
 - [x] `GET /v1/jobs/{jobId}`
 - [x] `POST /v1/jobs/{jobId}/cancel`
 - [x] `GET /v1/jobs/{jobId}/artifact`
+- [x] `POST /v1/chunks/url`
+- [x] `POST /v1/chunks/upload`
+- [x] `POST /v1/analyze/audio-activity/url`
+- [x] `POST /v1/analyze/audio-activity/upload`
 - [x] `GET /v1/health`
 - [x] `GET /v1/capabilities`
 - [x] `POST /v1/analyze/audio-activity`
@@ -54,7 +59,7 @@ It supports:
 ### Diagnostics
 
 - [x] standalone audio activity analysis endpoint
-- [x] optional `analysis.audioActivity` inside `POST /v1/jobs`
+- [x] optional `analysis.audioActivity` inside `POST /v1/jobs/url` and `POST /v1/jobs/upload`
 - [x] JSON error responses with `code`, `message`, and `details`
 
 ### Documentation
@@ -98,8 +103,8 @@ It supports:
 - [x] Docker image builds locally
 - [x] GitHub Actions ready for GHCR publishing
 - [x] Docker Hub publishing path documented and implemented
-- [ ] publish the first automated release from the organization repository
-- [ ] publish the first public Docker Hub image under the chosen namespace
+- [x] publish the first automated release from the organization repository
+- [x] publish the first public Docker Hub image under the chosen namespace
 
 ### Track 4: Future product expansion
 

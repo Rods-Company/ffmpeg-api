@@ -22,6 +22,7 @@ This API packages that into a single service with:
 - queue-based parallel processing
 - recipe-driven transformations
 - audio activity analysis
+- chunking designed to keep transcription workloads manageable, including avoiding oversized files that may timeout in tools such as Whisper
 - OpenAPI documentation rendered by Scalar
 
 ## ✨ Features
@@ -50,14 +51,18 @@ This API packages that into a single service with:
 
 ## 🔌 API
 
-- `GET /` service landing page
+- `GET /` redirects to `/docs`
 - `GET /docs` interactive API documentation
 - `GET /openapi.yaml` raw OpenAPI document
 - `GET /endpoints` endpoint listing as JSON
 - `GET /v1/health` service health and effective runtime settings
 - `GET /v1/capabilities` runtime FFmpeg, FFprobe, formats, codecs, and filters
-- `POST /v1/analyze/audio-activity` heuristic analysis for background-only detection
-- `POST /v1/jobs` create a processing job from JSON URL input or multipart upload
+- `POST /v1/analyze/audio-activity/url` heuristic analysis from a remote URL
+- `POST /v1/analyze/audio-activity/upload` heuristic analysis from an uploaded file
+- `POST /v1/jobs/url` create a processing job from JSON URL input
+- `POST /v1/jobs/upload` create a processing job from multipart upload
+- `POST /v1/chunks/url` split remote audio or video into chunks and return a ZIP file or async job
+- `POST /v1/chunks/upload` split uploaded audio or video into chunks and return a ZIP file or async job
 - `GET /v1/jobs/:jobId` poll async job state
 - `POST /v1/jobs/:jobId/cancel` cancel a queued or running job
 - `GET /v1/jobs/:jobId/artifact` download the completed output file
@@ -68,7 +73,9 @@ This API packages that into a single service with:
 - upload input uses `multipart/form-data`
 - `mode=auto|sync|async` controls whether the request should try the synchronous path
 - small inputs can be processed synchronously when `ENABLE_SYNC_SMALL_JOBS=true`
-- `analysis.audioActivity` can be enabled inside `POST /v1/jobs` to avoid sending the same file twice
+- `analysis.audioActivity` can be enabled inside `POST /v1/jobs/url` and `POST /v1/jobs/upload` to avoid sending the same file twice
+- chunking is exposed through separate `url` and `upload` routes for clearer contracts and better API documentation
+- supported input and output formats depend on the FFmpeg runtime; use `GET /v1/capabilities` when you need the real formats, codecs, and filters available in the current deployment
 
 ## ▶️ Running
 
@@ -172,6 +179,8 @@ For the full explanation of every variable, including defaults, tradeoffs, and w
 
 Input media can be anything that FFmpeg supports. `.ogg` is a first-class supported output format in the API examples and tests.
 
+When you need the actual formats, codecs, and filters supported by the current deployment, use `GET /v1/capabilities`. That endpoint is the runtime source of truth.
+
 You can send media in two ways:
 
 - by URL with `application/json`
@@ -182,7 +191,7 @@ For uploads, use a file field named `file`.
 ### Sync request from URL
 
 ```bash
-curl -X POST http://127.0.0.1:3000/v1/jobs \
+curl -X POST http://127.0.0.1:3000/v1/jobs/url \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "sync",
@@ -217,7 +226,7 @@ When `analysis.audioActivity` is enabled in synchronous mode, the API returns th
 ### Sync request from upload
 
 ```bash
-curl -X POST http://127.0.0.1:3000/v1/jobs \
+curl -X POST http://127.0.0.1:3000/v1/jobs/upload \
   -F "file=@./input.ogg" \
   -F "mode=sync" \
   -F "analysis={\"audioActivity\":true}" \
@@ -228,7 +237,7 @@ curl -X POST http://127.0.0.1:3000/v1/jobs \
 ### Async request from URL
 
 ```bash
-curl -X POST http://127.0.0.1:3000/v1/jobs \
+curl -X POST http://127.0.0.1:3000/v1/jobs/url \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "async",
@@ -257,6 +266,99 @@ curl -X POST http://127.0.0.1:3000/v1/jobs \
   }'
 ```
 
+### Chunk media into equal parts
+
+```bash
+curl -X POST http://127.0.0.1:3000/v1/chunks/url \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "sync",
+    "input": {
+      "type": "url",
+      "url": "https://example.com/input.ogg"
+    },
+    "output": {
+      "container": "ogg",
+      "filenamePrefix": "part",
+      "archiveName": "parts.zip"
+    },
+    "chunking": {
+      "strategy": "parts",
+      "parts": 4,
+      "paddingBeforeSeconds": 0.5,
+      "paddingAfterSeconds": 0.5
+    }
+  }' > parts.zip
+```
+
+### Chunk media on silence
+
+```bash
+curl -X POST http://127.0.0.1:3000/v1/chunks/url \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "async",
+    "input": {
+      "type": "url",
+      "url": "https://example.com/interview.ogg"
+    },
+    "output": {
+      "container": "ogg",
+      "filenamePrefix": "segment",
+      "archiveName": "segments.zip"
+    },
+    "chunking": {
+      "strategy": "silence",
+      "minSilenceDuration": 0.5,
+      "paddingBeforeSeconds": 0.2,
+      "paddingAfterSeconds": 0.2,
+      "minChunkDurationSeconds": 1,
+      "maxChunkDurationSeconds": 20
+    }
+  }'
+```
+
+The generated artifact is a `.zip` file containing each chunk plus a `manifest.json` with the chunk boundaries.
+
+`chunking.strategy` is the field that selects the chunk mode:
+
+- `parts` divides the full media into equal parts and uses `parts`
+- `duration` divides every fixed interval and uses `segmentDuration`
+- `silence` cuts around active segments and uses silence-related options such as `minSilenceDuration`
+- `maxChunkDurationSeconds` can be used with `silence` to keep chunks small enough for transcription without needing perfectly precise cuts
+- in `parts` and `duration`, `paddingBeforeSeconds` and `paddingAfterSeconds` tell the API to look for a nearby silence before doing a hard cut
+
+### Chunk upload with multipart form-data
+
+```bash
+curl -X POST http://127.0.0.1:3000/v1/chunks/upload \
+  -F "file=@./input.ogg" \
+  -F "mode=sync" \
+  -F "container=ogg" \
+  -F "filenamePrefix=part" \
+  -F "archiveName=parts.zip" \
+  -F "strategy=parts" \
+  -F "parts=4" \
+  -o parts.zip
+```
+
+### Chunk upload on silence with a maximum chunk duration
+
+```bash
+curl -X POST http://127.0.0.1:3000/v1/chunks/upload \
+  -F "file=@./input.ogg" \
+  -F "mode=async" \
+  -F "container=ogg" \
+  -F "filenamePrefix=segment" \
+  -F "archiveName=segments.zip" \
+  -F "strategy=silence" \
+  -F "minSilenceDuration=0.5" \
+  -F "paddingBeforeSeconds=0.2" \
+  -F "paddingAfterSeconds=0.2" \
+  -F "minChunkDurationSeconds=1" \
+  -F "maxChunkDurationSeconds=20"
+```
+
 ### Polling a job
 
 - `curl http://127.0.0.1:3000/v1/jobs/<jobId>`
@@ -267,7 +369,7 @@ When `analysis.audioActivity` is enabled for an async job, the diagnostic is att
 ### Async request from upload
 
 ```bash
-curl -X POST http://127.0.0.1:3000/v1/jobs \
+curl -X POST http://127.0.0.1:3000/v1/jobs/upload \
   -F "file=@./input.ogg" \
   -F "mode=async" \
   -F "analysis={\"audioActivity\":true}" \
@@ -277,7 +379,7 @@ curl -X POST http://127.0.0.1:3000/v1/jobs \
 ### Analyze whether audio is probably background-only
 
 ```bash
-curl -X POST http://127.0.0.1:3000/v1/analyze/audio-activity \
+curl -X POST http://127.0.0.1:3000/v1/analyze/audio-activity/url \
   -H "Content-Type: application/json" \
   -d '{
     "input": {
@@ -298,7 +400,7 @@ This endpoint does not recognize speech. It uses a speech-band activity heuristi
 ### Analyze an uploaded file
 
 ```bash
-curl -X POST http://127.0.0.1:3000/v1/analyze/audio-activity \
+curl -X POST http://127.0.0.1:3000/v1/analyze/audio-activity/upload \
   -F "file=@./input.ogg" \
   -F "options={\"minActiveRatio\":0.08,\"minSegmentDuration\":1.2}"
 ```

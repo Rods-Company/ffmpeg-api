@@ -1,6 +1,7 @@
 const express = require('express');
 
 const jobs = require('./jobs.js');
+const chunks = require('./chunks.js');
 const analyze = require('./analyze.js');
 const capabilities = require('./capabilities.js');
 const health = require('./health.js');
@@ -8,6 +9,7 @@ const health = require('./health.js');
 const router = express.Router();
 
 router.use('/jobs', jobs);
+router.use('/chunks', chunks);
 router.use('/analyze', analyze);
 router.use('/capabilities', capabilities);
 router.use('/health', health);

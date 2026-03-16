@@ -13,17 +13,18 @@
   "license": "ISC",
   "dependencies": {
     "@scalar/express-api-reference": "^0.8.16",
+    "adm-zip": "^0.5.16",
+    "archiver": "^4.0.1",
     "busboy": "~0.3.1",
     "compression": "^1.7.4",
     "dotenv": "^16.4.5",
     "express": "^4.17.1",
+    "express-list-endpoints": "4.0.1",
     "express-readme": "0.0.5",
     "fluent-ffmpeg": "^2.1.2",
-    "express-list-endpoints": "4.0.1",
     "fs": "0.0.1-security",
     "unique-filename": "^1.1.1",
-    "winston": "^3.2.1",
-    "archiver": "^4.0.1"
+    "winston": "^3.2.1"
   },
   "devDependencies": {
     "eslint": "^6.8.0",

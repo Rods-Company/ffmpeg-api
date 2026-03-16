@@ -8,7 +8,12 @@ An async-first media processing API powered by FFMPEG and maintained by Rods Com
 - Runtime capabilities: `GET /v1/capabilities`
 - Interactive docs: `GET /docs`
 - Raw OpenAPI: `GET /openapi.yaml`
-- Create a job: `POST /v1/jobs`
+- Create a URL job: `POST /v1/jobs/url`
+- Upload a file job: `POST /v1/jobs/upload`
+- Create URL chunks: `POST /v1/chunks/url`
+- Upload file chunks: `POST /v1/chunks/upload`
+- Analyze URL audio: `POST /v1/analyze/audio-activity/url`
+- Analyze uploaded audio: `POST /v1/analyze/audio-activity/upload`
 - Uploads use `multipart/form-data` with a file field named `file`
 
 ## ✨ What It Does
@@ -16,8 +21,12 @@ An async-first media processing API powered by FFMPEG and maintained by Rods Com
 - Processes audio and video through a recipe-based API
 - Accepts upload input and direct URL input
 - Runs small requests synchronously and larger ones asynchronously
+- Splits media into ZIP chunks by parts, duration, or silence
+- Keeps chunking practical for transcription pipelines by helping avoid oversized chunks that may timeout in tools such as Whisper
 - Analyzes audio activity to detect background-only input
 - Exposes runtime FFmpeg capabilities and interactive documentation
+
+The real supported formats, codecs, and filters depend on the FFmpeg runtime available in the current deployment. Use `GET /v1/capabilities` as the source of truth.
 
 ## 📚 Important Links
 

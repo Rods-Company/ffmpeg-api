@@ -16,23 +16,24 @@ servers:
 tags:
   - name: Jobs
     description: Create, inspect, cancel, and download processing jobs.
+  - name: Chunks
+    description: Split audio or video into multiple chunks and return a ZIP artifact.
   - name: Analysis
     description: Analyze audio files using lightweight FFmpeg-based heuristics.
   - name: Capabilities
-    description: Discover runtime FFmpeg and FFprobe capabilities.
+    description: Discover the real FFmpeg and FFprobe capabilities available in the current deployment.
   - name: Health
     description: Basic service health and readiness checks.
 security: []
 paths:
-  /v1/jobs:
+  /v1/jobs/url:
     post:
       tags:
         - Jobs
-      operationId: createJob
-      summary: Create a media processing job
+      operationId: createJobFromUrl
+      summary: Create a media processing job from a remote URL
       description: >
-        Creates an asynchronous processing job. Input may be provided as a
-        remote URL in JSON or as an uploaded file in multipart form data.
+        Creates a processing job from a remote URL using application/json.
       requestBody:
         required: true
         content:
@@ -60,15 +61,80 @@ paths:
                         stopDuration: 0.5
                       - type: speed
                         factor: 1.25
+      responses:
+        '200':
+          description: Output generated synchronously
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '202':
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Input too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Queue is full
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/jobs/upload:
+    post:
+      tags:
+        - Jobs
+      operationId: createJobFromUpload
+      summary: Create a media processing job from an uploaded file
+      description: >
+        Creates a processing job from a multipart file upload.
+      requestBody:
+        required: true
+        content:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/UploadJobCreateRequest'
+            examples:
+              uploadJob:
+                summary: Upload a file and process it
+                value:
+                  file: (binary)
+                  mode: sync
+                  analysis:
+                    audioActivity: true
+                  recipe:
+                    output:
+                      container: ogg
+                      filename: upload-output.ogg
+                    operations:
+                      - type: speed
+                        factor: 1.2
             encoding:
               recipe:
                 contentType: application/json
               analysis:
                 contentType: application/json
       responses:
+        '200':
+          description: Output generated synchronously
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
         '202':
           description: Job accepted
           content:
@@ -169,18 +235,181 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /v1/analyze/audio-activity:
+  /v1/chunks/url:
+    post:
+      tags:
+        - Chunks
+      operationId: createChunkJobFromUrl
+      summary: Split remote media into chunks and return a ZIP archive
+      description: >
+        Creates media chunks from a remote URL. Chunking strategies include
+        equal parts, fixed duration, and speech-oriented silence splitting.
+        The `silence` strategy prefers silence boundaries so chunks stay
+        transcription-friendly, while `maxChunkDurationSeconds` prevents chunks
+        from growing too large. This behavior is intended to keep transcription
+        workloads manageable and avoid oversized files that may timeout in tools
+        such as Whisper.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChunkUrlRequest'
+            examples:
+              silenceChunks:
+                summary: Split speech-like segments on silence
+                value:
+                  mode: async
+                  input:
+                    type: url
+                    url: https://cdn.example.com/audio/interview.ogg
+                  output:
+                    container: ogg
+                    filenamePrefix: interview
+                    archiveName: interview-chunks.zip
+                  chunking:
+                    strategy: silence
+                    minSilenceDuration: 0.5
+                    paddingBeforeSeconds: 0.2
+                    paddingAfterSeconds: 0.2
+                    minChunkDurationSeconds: 1
+                    maxChunkDurationSeconds: 20
+              equalParts:
+                summary: Split a clip into equal parts
+                value:
+                  mode: sync
+                  input:
+                    type: url
+                    url: https://cdn.example.com/video/trailer.mp4
+                  output:
+                    container: mp4
+                    filenamePrefix: trailer-part
+                  chunking:
+                    strategy: parts
+                    parts: 4
+                    paddingBeforeSeconds: 0.5
+                    paddingAfterSeconds: 0.5
+      responses:
+        '200':
+          description: ZIP archive generated synchronously
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '202':
+          description: Chunk job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Input too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: No chunks could be produced from the input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/chunks/upload:
+    post:
+      tags:
+        - Chunks
+      operationId: createChunkJobFromUpload
+      summary: Split uploaded media into chunks and return a ZIP archive
+      description: >
+        Creates media chunks from a multipart upload. Chunking strategies
+        include equal parts, fixed duration, and speech-oriented silence
+        splitting. The `silence` strategy prefers silence boundaries so chunks
+        stay transcription-friendly, while `maxChunkDurationSeconds` prevents
+        chunks from growing too large. This behavior is intended to keep
+        transcription workloads manageable and avoid oversized files that may
+        timeout in tools such as Whisper.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChunkUploadFormRequest'
+            examples:
+              uploadChunksByParts:
+                summary: Upload a file and split it into parts
+                value:
+                  file: (binary)
+                  mode: sync
+                  container: ogg
+                  filenamePrefix: part
+                  archiveName: parts.zip
+                  strategy: parts
+                  parts: 4
+                  paddingBeforeSeconds: 0.5
+                  paddingAfterSeconds: 0.5
+              uploadChunksBySilence:
+                summary: Upload a file and split it on silence
+                value:
+                  file: (binary)
+                  mode: async
+                  container: ogg
+                  filenamePrefix: segment
+                  archiveName: segments.zip
+                  strategy: silence
+                  minSilenceDuration: 0.5
+                  paddingBeforeSeconds: 0.2
+                  paddingAfterSeconds: 0.2
+                  minChunkDurationSeconds: 1
+                  maxChunkDurationSeconds: 20
+      responses:
+        '200':
+          description: ZIP archive generated synchronously
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '202':
+          description: Chunk job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Input too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: No chunks could be produced from the input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/analyze/audio-activity/url:
     post:
       tags:
         - Analysis
-      operationId: analyzeAudioActivity
-      summary: >-
-        Analyze whether audio is mostly silence or only low-value background
-        activity
+      operationId: analyzeAudioActivityFromUrl
+      summary: Analyze audio activity from a remote URL
       description: >
         Runs a speech-band activity heuristic using FFmpeg silence detection.
         This endpoint does not perform speech recognition. It is intended to
-        detect whether an audio file is likely background-only or contains
+        detect whether a remote audio file is likely background-only or contains
         foreground activity.
       requestBody:
         required: true
@@ -188,9 +417,48 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AudioActivityUrlRequest'
+      responses:
+        '200':
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioActivityResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Input too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/analyze/audio-activity/upload:
+    post:
+      tags:
+        - Analysis
+      operationId: analyzeAudioActivityFromUpload
+      summary: Analyze audio activity from an uploaded file
+      description: >
+        Runs a speech-band activity heuristic using FFmpeg silence detection on
+        an uploaded file. This endpoint does not perform speech recognition.
+      requestBody:
+        required: true
+        content:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/AudioActivityUploadRequest'
+            examples:
+              uploadAnalysis:
+                summary: Upload a file and analyze audio activity
+                value:
+                  file: (binary)
+                  options:
+                    minActiveRatio: 0.08
+                    minSegmentDuration: 1.2
             encoding:
               options:
                 contentType: application/json
@@ -219,6 +487,10 @@ paths:
         - Capabilities
       operationId: getCapabilities
       summary: List runtime FFmpeg capabilities
+      description: >
+        Returns the real formats, codecs, filters, and tool versions available
+        in the current deployment. Use this endpoint whenever you need to know
+        what the running service actually supports.
       responses:
         '200':
           description: Runtime capabilities
@@ -329,8 +601,8 @@ components:
           type: string
           format: binary
         options:
-          description: JSON-encoded AudioActivityOptions
-          type: string
+          description: Audio activity options sent as a JSON multipart part.
+          $ref: '#/components/schemas/AudioActivityOptions'
     UploadJobCreateRequest:
       type: object
       required:
@@ -340,12 +612,121 @@ components:
         file:
           type: string
           format: binary
+        mode:
+          type: string
+          enum:
+            - auto
+            - sync
+            - async
         analysis:
-          description: JSON-encoded JobAnalysisRequest
-          type: string
+          description: Job analysis options sent as a JSON multipart part.
+          $ref: '#/components/schemas/JobAnalysisRequest'
         recipe:
-          description: JSON-encoded TransformRecipe
+          description: Transform recipe sent as a JSON multipart part.
+          $ref: '#/components/schemas/TransformRecipe'
+    ChunkUrlRequest:
+      type: object
+      required:
+        - input
+        - chunking
+      properties:
+        mode:
           type: string
+          enum:
+            - auto
+            - sync
+            - async
+        input:
+          type: object
+          required:
+            - type
+            - url
+          properties:
+            type:
+              type: string
+              const: url
+            url:
+              type: string
+              format: uri
+        output:
+          $ref: '#/components/schemas/ChunkOutput'
+        chunking:
+          description: >
+            Choose how the media should be split. Use `strategy: parts` for
+            equal parts, `strategy: duration` for fixed-size segments, or
+            `strategy: silence` for silence-aware splitting.
+          $ref: '#/components/schemas/ChunkingRequest'
+    ChunkUploadFormRequest:
+      type: object
+      required:
+        - file
+        - strategy
+      properties:
+        file:
+          type: string
+          format: binary
+        mode:
+          type: string
+          enum:
+            - auto
+            - sync
+            - async
+        container:
+          type: string
+          enum:
+            - mp3
+            - wav
+            - ogg
+            - mp4
+            - m4a
+          description: Output container for each generated chunk.
+        filenamePrefix:
+          type: string
+          example: part
+          description: Prefix used when naming each chunk inside the ZIP.
+        archiveName:
+          type: string
+          example: parts.zip
+          description: ZIP filename returned by the endpoint.
+        strategy:
+          type: string
+          enum:
+            - parts
+            - duration
+            - silence
+          description: Selects how chunking works.
+        parts:
+          type: integer
+          minimum: 1
+          maximum: 200
+          description: Required when `strategy=parts`.
+        segmentDuration:
+          description: Required when `chunking.strategy=duration`.
+          oneOf:
+            - type: number
+              minimum: 0.001
+            - type: string
+              example: 00:00:30
+        noiseThresholdDb:
+          oneOf:
+            - type: number
+            - type: string
+              example: -35dB
+        minSilenceDuration:
+          type: number
+        paddingBeforeSeconds:
+          type: number
+        paddingAfterSeconds:
+          type: number
+        minChunkDurationSeconds:
+          type: number
+        mergeGapSeconds:
+          type: number
+        maxChunkDurationSeconds:
+          type: number
+          description: Optional practical cap for each silence-based chunk.
+        useSpeechBand:
+          type: boolean
     JobAnalysisRequest:
       type: object
       properties:
@@ -393,6 +774,155 @@ components:
           minItems: 1
           items:
             $ref: '#/components/schemas/Operation'
+    ChunkOutput:
+      type: object
+      properties:
+        container:
+          type: string
+          enum:
+            - mp3
+            - wav
+            - ogg
+            - mp4
+            - m4a
+        filenamePrefix:
+          type: string
+          example: chunk
+        archiveName:
+          type: string
+          example: chunks.zip
+    ChunkingRequest:
+      description: >
+        Defines how chunking works. The `strategy` field is the selector:
+        send `parts`, `duration`, or `silence`.
+      discriminator:
+        propertyName: strategy
+        mapping:
+          parts: '#/components/schemas/ChunkByParts'
+          duration: '#/components/schemas/ChunkByDuration'
+          silence: '#/components/schemas/ChunkBySilence'
+      oneOf:
+        - $ref: '#/components/schemas/ChunkByParts'
+        - $ref: '#/components/schemas/ChunkByDuration'
+        - $ref: '#/components/schemas/ChunkBySilence'
+    ChunkByParts:
+      title: Split By Parts
+      description: >
+        Divide the full input into a fixed number of equal parts. When padding
+        is provided, the API tries to move each cut to a nearby silence within
+        the allowed window.
+      type: object
+      required:
+        - strategy
+        - parts
+      properties:
+        strategy:
+          type: string
+          const: parts
+          description: Use `parts` to split the input into N equal chunks.
+          example: parts
+        parts:
+          description: Total number of equal chunks to generate.
+          type: integer
+          minimum: 1
+          maximum: 200
+        paddingBeforeSeconds:
+          type: number
+          description: How far before the target cut to look for silence.
+        paddingAfterSeconds:
+          type: number
+          description: How far after the target cut to look for silence.
+        noiseThresholdDb:
+          oneOf:
+            - type: number
+            - type: string
+              example: -35dB
+        minSilenceDuration:
+          type: number
+          example: 0.5
+        useSpeechBand:
+          type: boolean
+          example: true
+    ChunkByDuration:
+      title: Split By Duration
+      description: >
+        Split the input into chunks with a fixed duration. When padding is
+        provided, the API tries to move each cut to a nearby silence within the
+        allowed window.
+      type: object
+      required:
+        - strategy
+        - segmentDuration
+      properties:
+        strategy:
+          type: string
+          const: duration
+          description: Use `duration` to create chunks every X seconds.
+          example: duration
+        segmentDuration:
+          description: Positive number of seconds or HH:MM:SS(.mmm)
+          oneOf:
+            - type: number
+              minimum: 0.001
+            - type: string
+              example: 00:00:30
+        paddingBeforeSeconds:
+          type: number
+          description: How far before the target cut to look for silence.
+        paddingAfterSeconds:
+          type: number
+          description: How far after the target cut to look for silence.
+        noiseThresholdDb:
+          oneOf:
+            - type: number
+            - type: string
+              example: -35dB
+        minSilenceDuration:
+          type: number
+          example: 0.5
+        useSpeechBand:
+          type: boolean
+          example: true
+    ChunkBySilence:
+      title: Split By Silence
+      description: >
+        Detect speech-like activity and create one chunk per active segment,
+        using silence as the boundary.
+      type: object
+      required:
+        - strategy
+      properties:
+        strategy:
+          type: string
+          const: silence
+          description: Use `silence` to cut around active segments separated by silence.
+          example: silence
+        noiseThresholdDb:
+          oneOf:
+            - type: number
+            - type: string
+              example: -35dB
+        minSilenceDuration:
+          type: number
+          example: 0.5
+        paddingBeforeSeconds:
+          type: number
+          example: 0.25
+        paddingAfterSeconds:
+          type: number
+          example: 0.25
+        minChunkDurationSeconds:
+          type: number
+          example: 1
+        maxChunkDurationSeconds:
+          type: number
+          example: 20
+        mergeGapSeconds:
+          type: number
+          example: 0.15
+        useSpeechBand:
+          type: boolean
+          example: true
     Operation:
       type: object
       required:
@@ -502,6 +1032,10 @@ components:
                   format: int64
                 downloadUrl:
                   type: string
+                chunkCount:
+                  anyOf:
+                    - type: integer
+                    - type: 'null'
             - type: 'null'
         metrics:
           type: object

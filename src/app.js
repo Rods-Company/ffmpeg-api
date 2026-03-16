@@ -10,6 +10,7 @@ const {getStartupBanner} = require('./utils/startup-banner.js');
 const constants = require('./constants.js');
 const {getOpenApiDocument, getEffectivePublicBaseUrl} = require('./services/openapi-doc.js');
 const {normalizeError} = require('./services/errors.js');
+const {getScalarCustomCss} = require('./services/scalar-doc.js');
 
 const timeout = constants.jobTimeoutMs;
 let signalHandlersConfigured = false;
@@ -64,6 +65,7 @@ function getScalarMiddleware() {
                     baseServerURL: constants.publicBaseUrl || undefined,
                     url: '/openapi.yaml',
                     pageTitle: constants.scalarTitle,
+                    customCss: getScalarCustomCss(),
                 });
             });
     }
@@ -93,9 +95,13 @@ function createApp() {
             .catch(next);
     });
 
+    app.get('/', function(req, res) {
+        res.redirect(302, '/docs');
+    });
+
     require('express-readme')(app, {
         filename: 'index.md',
-        routes: ['/'],
+        routes: ['/overview'],
     });
 
     app.get('/endpoints', function(req, res) {

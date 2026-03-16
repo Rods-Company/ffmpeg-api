@@ -4,6 +4,7 @@ const Busboy = require('busboy');
 const constants = require('../constants.js');
 const logger = require('../utils/logger.js');
 const {createValidationError} = require('./recipe-validator.js');
+const {assignNestedField, readMultipartValue} = require('./multipart-fields.js');
 const {createTempPath} = require('./temp-path.js');
 
 function parseAudioActivityRequest(req) {
@@ -36,6 +37,7 @@ function parseJsonRequest(req) {
 function parseMultipartRequest(req) {
     return new Promise(function(resolve, reject) {
         let optionsValue = null;
+        const rawFields = {};
         let hasFile = false;
         let originalFileName = null;
         let savedFile = createTempPath('v1-analysis');
@@ -44,19 +46,18 @@ function parseMultipartRequest(req) {
         const busboy = new Busboy({
             headers: req.headers,
             limits: {
-                fields: 1,
+                fields: 25,
                 files: 1,
                 fileSize: constants.fileSizeLimit,
             },
         });
 
         busboy.on('field', function(fieldName, value) {
+            assignNestedField(rawFields, fieldName, value);
             if (fieldName === 'options') {
                 optionsValue = value;
                 return;
             }
-
-            rejectOnce(createValidationError(`unsupported field: ${fieldName}`));
         });
 
         busboy.on('file', function(fieldName, file, filename) {
@@ -98,7 +99,7 @@ function parseMultipartRequest(req) {
                         filePath: savedFile,
                         originalFileName: originalFileName,
                     },
-                    options: normalizeOptions(optionsValue ? JSON.parse(optionsValue) : {}),
+                    options: normalizeOptions(readMultipartValue(rawFields, 'options', optionsValue ? JSON.parse(optionsValue) : {})),
                 });
             } catch (error) {
                 safeDelete(savedFile);
@@ -155,4 +156,6 @@ function safeDelete(filePath) {
 
 module.exports = {
     parseAudioActivityRequest,
+    parseJsonRequest,
+    parseMultipartRequest,
 };
