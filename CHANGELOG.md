@@ -2,6 +2,18 @@
 
 All notable changes to this project are tracked here.
 
+## [1.2.0](https://github.com/Rods-Company/ffmpeg-api/compare/v1.1.1...v1.2.0) (2026-03-16)
+
+
+### Features
+
+* add chunking functionality with synchronous and asynchronous processing ([#7](https://github.com/Rods-Company/ffmpeg-api/issues/7)) ([e0c823e](https://github.com/Rods-Company/ffmpeg-api/commit/e0c823e1951ba3d4233fd785eed267569dd6aa5c))
+
+
+### Documentation
+
+* Organize Enviroment variables ([#5](https://github.com/Rods-Company/ffmpeg-api/issues/5)) ([259bf7c](https://github.com/Rods-Company/ffmpeg-api/commit/259bf7c7b1756d193d74aa0c713339541cc172ed))
+
 ## [1.1.1](https://github.com/Rods-Company/ffmpeg-api/compare/v1.1.0...v1.1.1) (2026-03-14)
 
 
