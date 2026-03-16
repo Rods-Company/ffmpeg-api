@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ffmpeg-api
-  version: 1.1.1
+  version: 1.2.0
   summary: Async-first media processing API powered by FFmpeg
   description: >
     Draft OpenAPI contract for the next version of ffmpeg-api. This
@@ -21,7 +21,9 @@ tags:
   - name: Analysis
     description: Analyze audio files using lightweight FFmpeg-based heuristics.
   - name: Capabilities
-    description: Discover the real FFmpeg and FFprobe capabilities available in the current deployment.
+    description: >-
+      Discover the real FFmpeg and FFprobe capabilities available in the current
+      deployment.
   - name: Health
     description: Basic service health and readiness checks.
 security: []
@@ -32,7 +34,7 @@ paths:
         - Jobs
       operationId: createJobFromUrl
       summary: Create a media processing job from a remote URL
-      description: >
+      description: |
         Creates a processing job from a remote URL using application/json.
       requestBody:
         required: true
@@ -99,7 +101,7 @@ paths:
         - Jobs
       operationId: createJobFromUpload
       summary: Create a media processing job from an uploaded file
-      description: >
+      description: |
         Creates a processing job from a multipart file upload.
       requestBody:
         required: true
@@ -243,8 +245,8 @@ paths:
       summary: Split remote media into chunks and return a ZIP archive
       description: >
         Creates media chunks from a remote URL. Chunking strategies include
-        equal parts, fixed duration, and speech-oriented silence splitting.
-        The `silence` strategy prefers silence boundaries so chunks stay
+        equal parts, fixed duration, and speech-oriented silence splitting. The
+        `silence` strategy prefers silence boundaries so chunks stay
         transcription-friendly, while `maxChunkDurationSeconds` prevents chunks
         from growing too large. This behavior is intended to keep transcription
         workloads manageable and avoid oversized files that may timeout in tools
@@ -706,12 +708,12 @@ components:
             - type: number
               minimum: 0.001
             - type: string
-              example: 00:00:30
+              example: '00:00:30'
         noiseThresholdDb:
           oneOf:
             - type: number
             - type: string
-              example: -35dB
+              example: '-35dB'
         minSilenceDuration:
           type: number
         paddingBeforeSeconds:
@@ -793,8 +795,8 @@ components:
           example: chunks.zip
     ChunkingRequest:
       description: >
-        Defines how chunking works. The `strategy` field is the selector:
-        send `parts`, `duration`, or `silence`.
+        Defines how chunking works. The `strategy` field is the selector: send
+        `parts`, `duration`, or `silence`.
       discriminator:
         propertyName: strategy
         mapping:
@@ -836,7 +838,7 @@ components:
           oneOf:
             - type: number
             - type: string
-              example: -35dB
+              example: '-35dB'
         minSilenceDuration:
           type: number
           example: 0.5
@@ -865,7 +867,7 @@ components:
             - type: number
               minimum: 0.001
             - type: string
-              example: 00:00:30
+              example: '00:00:30'
         paddingBeforeSeconds:
           type: number
           description: How far before the target cut to look for silence.
@@ -876,7 +878,7 @@ components:
           oneOf:
             - type: number
             - type: string
-              example: -35dB
+              example: '-35dB'
         minSilenceDuration:
           type: number
           example: 0.5
@@ -901,7 +903,7 @@ components:
           oneOf:
             - type: number
             - type: string
-              example: -35dB
+              example: '-35dB'
         minSilenceDuration:
           type: number
           example: 0.5
